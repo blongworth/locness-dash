@@ -57,7 +57,7 @@ def get_map_fields():
 # App layout
 app.layout = html.Div(
     [
-        html.H1("Ship Underway Data Dashboard", style={"textAlign": "center"}),
+        html.H1("LOCNESS Underway Dashboard", style={"textAlign": "center"}),
         # Controls
         html.Div(
             [

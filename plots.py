@@ -5,9 +5,6 @@ def create_timeseries_plot(data, fields):
     """Create timeseries plot with subplots for multiple fields"""
     if data.empty or not fields:
         fig = go.Figure()
-        fig.update_layout(
-            title="Timeseries Plot", xaxis_title="Time", yaxis_title="Value", height=500
-        )
         return fig
 
     n_fields = len(fields)
@@ -16,7 +13,7 @@ def create_timeseries_plot(data, fields):
         cols=1,
         shared_xaxes=True,
         subplot_titles=fields,
-        vertical_spacing=0.1,
+        vertical_spacing=0.05,
     )
 
     for i, field in enumerate(fields):
@@ -30,122 +27,119 @@ def create_timeseries_plot(data, fields):
                     line=dict(width=2),
                     marker=dict(size=4),
                 ),
-                row=i + 1,
-                col=1,
+                row=i + 1, col=1,
             )
 
     fig.update_layout(
-        height=500,
-        title="Marine Data Timeseries",
-        xaxis=dict(
-            rangeslider=dict(visible=True),
-            rangeselector=dict(
-                buttons=list(
-                    [
-                        dict(count=1, label="1h", step="hour", stepmode="backward"),
-                        dict(count=6, label="6h", step="hour", stepmode="backward"),
-                        dict(count=1, label="1d", step="day", stepmode="backward"),
-                        dict(count=7, label="7d", step="day", stepmode="backward"),
-                        dict(step="all"),
-                    ]
-                )
-            ),
-        ),
-        showlegend=True,
+        height=150 + 200 * len(fields),
+        showlegend=False,
+        margin=dict(t=10, b=10, l=10, r=10)  # Adjust margins to reduce whitespace
     )
-
+    for i in range(1, len(fields) + 1):
+        fig.update_xaxes(
+            title_text="",
+            row=i, col=1,
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1h", step="hour", stepmode="backward"),
+                    dict(count=6, label="6h", step="hour", stepmode="backward"),
+                    dict(count=12, label="12h", step="hour", stepmode="backward"),
+                    dict(count=1, label="1d", step="day", stepmode="backward"),
+                    dict(step="all")
+                ])
+            ) if i == 1 else None,
+            rangeslider=dict(visible=(i == len(fields))),
+            type="date"
+        )
     return fig
 
-def create_map_plot(data, field):
-    """Create ship track map plot"""
-    if (
-        data.empty
-        or not field
-        or "latitude" not in data.columns
-        or "longitude" not in data.columns
-    ):
-        fig = go.Figure(go.Scattermapbox())
-        fig.update_layout(
-            mapbox=dict(
-                style="open-street-map", center=dict(lat=40.7128, lon=-74.0060), zoom=5
-            ),
-            title="Ship Track",
-            height=500,
-        )
-        return fig
-
-    map_data = data.dropna(subset=["latitude", "longitude", field])
-
-    if map_data.empty:
-        fig = go.Figure(go.Scattermapbox())
-        fig.update_layout(
-            mapbox=dict(
-                style="open-street-map", center=dict(lat=40.7128, lon=-74.0060), zoom=5
-            ),
-            title="Ship Track",
-            height=500,
-        )
-        return fig
-
+def create_map_plot(df, field):
+    if df.empty:
+        return go.Figure()
+    track_data = df
     fig = go.Figure()
-    fig.add_trace(
-        go.Scattermapbox(
-            lat=map_data["latitude"],
-            lon=map_data["longitude"],
-            mode="lines",
-            line=dict(width=2, color="blue"),
-            name="Ship Track",
-            hoverinfo="skip",
-        )
-    )
-    fig.add_trace(
-        go.Scattermapbox(
-            lat=map_data["latitude"],
-            lon=map_data["longitude"],
-            mode="markers",
+    if field and field in track_data.columns:
+        color_param = field
+        color_vals = track_data[color_param]
+        qmin = color_vals.quantile(0.05)
+        qmax = color_vals.quantile(0.95)
+        if qmin == qmax:
+            qmin = color_vals.min()
+            qmax = color_vals.max()
+        scatter = go.Scattermap(
+            lat=track_data['latitude'],
+            lon=track_data['longitude'],
+            mode='markers+lines',
             marker=dict(
-                size=8,
-                color=map_data[field],
-                colorscale="Viridis",
-                showscale=True,
-                colorbar=dict(title=field),
+                size=10,
+                color=color_vals,
+                colorscale='Viridis',
+                cmin=qmin,
+                cmax=qmax,
+                colorbar=dict(title=color_param.capitalize()),
+                showscale=True
             ),
-            text=[
-                f"{field}: {val:.3f}<br>Time: {time}<br>Lat: {lat:.4f}<br>Lon: {lon:.4f}"
-                for val, time, lat, lon in zip(
-                    map_data[field],
-                    map_data["timestamp"],
-                    map_data["latitude"],
-                    map_data["longitude"],
-                )
-            ],
-            hovertemplate="<b>%{text}</b><extra></extra>",
-            name=f"{field} Values",
+            name=f'Track ({color_param})',
+            text=[f"{color_param}: {v:.2f}" for v in color_vals],
+            hovertemplate=
+                'Lat: %{latitude:.4f}<br>' +
+                'Lon: %{longitude:.4f}<br>' +
+                f'{color_param}: %{{marker.color:.2f}}<extra></extra>'
         )
-    )
-    center_lat = map_data["latitude"].mean()
-    center_lon = map_data["longitude"].mean()
-    lat_range = map_data["latitude"].max() - map_data["latitude"].min()
-    lon_range = map_data["longitude"].max() - map_data["longitude"].min()
-    max_range = max(lat_range, lon_range)
-    if max_range > 10:
-        zoom = 3
-    elif max_range > 5:
-        zoom = 4
-    elif max_range > 1:
-        zoom = 6
-    elif max_range > 0.1:
-        zoom = 8
+        fig.add_trace(scatter)
     else:
-        zoom = 10
+        fig.add_trace(go.Scattermap(
+            lat=track_data['latitude'],
+            lon=track_data['longitude'],
+            mode='lines',
+            line=dict(width=2, color='blue'),
+            name='Track',
+            hoverinfo='skip'
+        ))
+    if not df.empty:
+        latest = df.iloc[-1]
+        fig.add_trace(go.Scattermap(
+            lat=[latest['latitude']],
+            lon=[latest['longitude']],
+            mode='markers',
+            marker=dict(size=15, color='red'),
+            name='Current Position',
+            hovertemplate='<b>Current Position</b><br>' +
+                         'Lat: %{latitude:.4f}<br>' +
+                         'Lon: %{longitude:.4f}<br>' +
+                         f'Rho: {latest["rho_ppb"]:.1f} ppb<br>' +
+                         f'Average pH: {latest["ph_corrected_ma"]:.2f}<extra></extra>'
+        ))
+    if not track_data.empty:
+        min_lat = track_data['latitude'].min()
+        max_lat = track_data['latitude'].max()
+        min_lon = track_data['longitude'].min()
+        max_lon = track_data['longitude'].max()
+        center_lat = (min_lat + max_lat) / 2
+        center_lon = (min_lon + max_lon) / 2
+        lat_range = max_lat - min_lat
+        lon_range = max_lon - min_lon
+        max_range = max(lat_range, lon_range)
+        if max_range < 0.002:
+            zoom = 15
+        elif max_range < 0.01:
+            zoom = 13
+        elif max_range < 0.05:
+            zoom = 11
+        elif max_range < 0.2:
+            zoom = 9
+        else:
+            zoom = 7
+    else:
+        center_lat, center_lon = 42.3601, -71.0589
+        zoom = 12
     fig.update_layout(
-        mapbox=dict(
-            style="open-street-map",
+        map=dict(
+            style="dark",
             center=dict(lat=center_lat, lon=center_lon),
-            zoom=zoom,
+            zoom=zoom
         ),
-        title=f"Ship Track - {field}",
-        height=500,
-        showlegend=True,
+        height=650,
+        margin=dict(t=10, b=10, l=10, r=10)  # Adjust margins to reduce whitespace
     )
     return fig
