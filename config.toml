@@ -1,11 +1,10 @@
 [locness_dash]
 # Path to the SQLite database file
 # Example: db_file_path = "underway_data.db"
-db_file_path = "underway_data.db"
-
+db_file_path = "/Users/brett/Library/CloudStorage/GoogleDrive-blongworth@whoi.edu/Shared drives/locness/synthetic_data/fake-data.sqlite"
 # Default resampling interval for the dropdown
 # Options: "1min", "10min", "1H", etc.
-default_resampling = "1min"
+default_resampling = "10min"
 
 # Update interval in seconds for the periodic data refresh
 update_interval = 10
