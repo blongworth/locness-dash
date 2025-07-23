@@ -6,6 +6,8 @@ from datetime import datetime
 import threading
 import time
 
+import dash_bootstrap_components as dbc
+
 from data import DataManager
 from plots import create_timeseries_plot, create_map_plot
 
@@ -23,7 +25,8 @@ data_manager = DataManager(config["db_file_path"])
 data_manager.load_initial_data()
 
 # Initialize Dash app
-app = dash.Dash(__name__)
+external_stylesheets = [dbc.themes.BOOTSTRAP]
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 
 # Get available fields (excluding timestamp, datetime_utc and id columns)
@@ -54,80 +57,62 @@ def get_map_fields():
     return []
 
 
-# App layout
-app.layout = html.Div(
-    [
-        html.H1("LOCNESS Underway Dashboard", style={"textAlign": "center"}),
-        # Controls
+
+app.layout = html.Div([
+    html.H1("LOCNESS Underway Dashboard", style={"textAlign": "center"}),
+    html.Div([
         html.Div(
             [
-                html.Div(
-                    [
-                        html.Label("Timeseries Fields:"),
-                        dcc.Dropdown(
-                            id="timeseries-fields-dropdown",
-                            options=[],
-                            value=["rho_ppb", "ph_corrected_ma"],
-                            multi=True,
-                            placeholder="Select marine data fields for timeseries",
-                        ),
-                    ],
-                    style={
-                        "width": "30%",
-                        "display": "inline-block",
-                        "paddingRight": "10px",
-                    },
+                html.Label("Timeseries Fields:"),
+                dcc.Dropdown(
+                    id="timeseries-fields-dropdown",
+                    options=[],
+                    value=["rho_ppb", "ph_corrected_ma"],
+                    multi=True,
+                    placeholder="Select marine data fields for timeseries",
                 ),
-                html.Div(
-                    [
-                        html.Label("Map Field:"),
-                        dcc.Dropdown(
-                            id="map-field-dropdown",
-                            options=[],
-                            value="rho_ppb",
-                            placeholder="Select field for ship track visualization",
-                        ),
-                    ],
-                    style={
-                        "width": "30%",
-                        "display": "inline-block",
-                        "paddingRight": "10px",
-                    },
+                html.Br(),
+                html.Label("Map Field:"),
+                dcc.Dropdown(
+                    id="map-field-dropdown",
+                    options=[],
+                    value="rho_ppb",
+                    placeholder="Select field for ship track visualization",
                 ),
-                html.Div(
-                    [
-                        html.Label("Resample Interval:"),
-                        dcc.Dropdown(
-                            id="resample-dropdown",
-                            options=[
-                                #{"label": "No Resampling", "value": None},
-                                {"label": "1 Minute", "value": "1min"},
-                                {"label": "10 Minutes", "value": "10min"},
-                                {"label": "1 Hour", "value": "1H"},
-                            ],
-                            value=config["default_resampling"],
-                            clearable=False,
-                        ),
+                html.Br(),
+                html.Label("Resample Interval:"),
+                dcc.Dropdown(
+                    id="resample-dropdown",
+                    options=[
+                        {"label": "1 Minute", "value": "1min"},
+                        {"label": "10 Minutes", "value": "10min"},
+                        {"label": "1 Hour", "value": "1H"},
                     ],
-                    style={"width": "30%", "display": "inline-block", "paddingRight": "10px"},
+                    value=config["default_resampling"],
+                    clearable=False,
                 ),
             ],
-            style={"padding": "20px"},
+            style={
+                "width": "250px",
+                "padding": "20px",
+                "background": "#f8f9fa",
+                "borderRight": "1px solid #ddd",
+                "height": "100%",
+            },
         ),
-        # Plots
+    ], id="sidebar-container", style={"position": "fixed", "top": 60, "left": 0, "zIndex": 1000}),
+    html.Div([
         html.Div([dcc.Graph(id="timeseries-plot", style={"height": "500px"})]),
         html.Div([dcc.Graph(id="map-plot", style={"height": "500px"})]),
-        # Store components for data management
-        dcc.Store(id="last-update-time"),
-        dcc.Store(id="time-range-store"),
-        # Interval component for periodic updates
-        dcc.Interval(
-            id="interval-component",
-            interval=config["update_interval"] * 1000,  # Convert to milliseconds
-            n_intervals=0,
-        ),
-    ]
-)
+    ], style={"marginLeft": "270px", "padding": "20px"}),
+    dcc.Store(id="last-update-time"),
+    dcc.Store(id="time-range-store"),
+    dcc.Interval(
+        id="interval-component",
+        interval=config["update_interval"] * 1000,
+        n_intervals=0,
+    ),
+])
 
 
 # Callback to update dropdown options and set default values
