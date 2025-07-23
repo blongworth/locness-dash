@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html, Input, Output, State, callback_context
+from dash import dcc, html, Input, Output, State
 import pandas as pd
 import tomllib
 from datetime import datetime
@@ -91,6 +91,9 @@ app.layout = html.Div([
                     value=config["default_resampling"],
                     clearable=False,
                 ),
+                html.Br(),
+                html.Div(id="last-update-display", style={"marginTop": "10px"}),
+                html.Div(id="most-recent-timestamp-display", style={"marginTop": "10px"}),
             ],
             style={
                 "width": "250px",
@@ -165,6 +168,8 @@ def update_dropdown_options(n, ts_value, map_value):
         Output("map-plot", "figure"),
         Output("time-range-store", "data"),
         Output("last-update-time", "data"),
+        Output("last-update-display", "children"),
+        Output("most-recent-timestamp-display", "children"),
     ],
     [
         Input("interval-component", "n_intervals"),
@@ -187,14 +192,6 @@ def update_plots(
     last_update,
     stored_time_range,
 ):
-    ctx = callback_context
-
-
-    # Check if this is a new data update or just a UI change
-    is_data_update = "interval-component" in [
-        p["prop_id"].split(".")[0] for p in ctx.triggered
-    ]
-
     # Get time range from timeseries plot
     time_range = stored_time_range
     if relayout_data and "xaxis.range[0]" in relayout_data:
@@ -212,39 +209,23 @@ def update_plots(
     # Create timeseries plot
     ts_fig = create_timeseries_plot(data, ts_fields or [])
 
-    # Preserve zoom/pan for timeseries plot (all subplots)
-    if relayout_data and is_data_update:
-        # Find all xaxis ranges in relayoutData
-        axis_updates = {}
-        for key in relayout_data:
-            if key.startswith("xaxis") and key.endswith(".range[0]"):
-                axis_prefix = key[:-len(".range[0]")]
-                range0 = relayout_data.get(f"{axis_prefix}.range[0]")
-                range1 = relayout_data.get(f"{axis_prefix}.range[1]")
-                if range0 is not None and range1 is not None:
-                    axis_updates[axis_prefix] = {"range": [range0, range1]}
-        if axis_updates:
-            ts_fig.update_layout(**axis_updates)
-
     # Create map plot
     map_fig = create_map_plot(data, map_field)
 
-    # Preserve zoom/pan for map plot
-    if relayout_data and is_data_update:
-        mapbox_update = {}
-        if "mapbox.center" in relayout_data:
-            mapbox_update["center"] = relayout_data["mapbox.center"]
-        if "mapbox.zoom" in relayout_data:
-            mapbox_update["zoom"] = relayout_data["mapbox.zoom"]
-        if mapbox_update:
-            # Merge with existing mapbox layout (preserve style, etc.)
-            current_mapbox = map_fig.layout.mapbox.to_plotly_json() if hasattr(map_fig.layout, "mapbox") and map_fig.layout.mapbox else {}
-            current_mapbox.update(mapbox_update)
-            map_fig.update_layout(mapbox=current_mapbox)
+    # Get the most recent timestamp from the data
+    most_recent_timestamp = data["timestamp"].max() if not data.empty else None
+    most_recent_timestamp_iso = most_recent_timestamp.isoformat() if most_recent_timestamp else "N/A"
 
-    current_time = datetime.now().isoformat()
+    current_time = datetime.now().replace(microsecond=0).isoformat()
 
-    return ts_fig, map_fig, time_range, current_time
+    return (
+        ts_fig,
+        map_fig,
+        time_range,
+        current_time,
+        f"Last Update: {current_time}",
+        f"Most Recent Data Timestamp: {most_recent_timestamp_iso}",
+    )
 
 
 # Background thread to check for new data
