@@ -1,16 +1,22 @@
-import dash
-from dash import dcc, html, Input, Output, State
-import pandas as pd
 import tomllib
 from datetime import datetime
 import threading
 import time
+import pandas as pd
 
+import dash
+from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 
 from data import DataManager
 from plots import create_timeseries_plot, create_map_plot
 
+# TODO: Plot selection bug: selecting on plot filters data, can't zoom out
+# TODO: Fix "jump" on data update
+# TODO: Add data to traces rather than redrawing entire plot
+# TODO: Dispersal View
+# TODO: Diagnostics View
+# TODO: Property plot view
 
 # Load configuration from config.toml
 with open("config.toml", "rb") as f:
