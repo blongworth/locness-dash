@@ -8,18 +8,24 @@ class DataManager:
         self.last_datetime_utc = None
         self.data = pd.DataFrame()
         self.lock = threading.Lock()
+        self.is_parquet = db_path.endswith(".parquet")
 
     def get_connection(self):
+        if self.is_parquet:
+            raise ValueError("Parquet does not use a database connection.")
         return sqlite3.connect(self.db_path)
 
     def load_initial_data(self):
-        """Load all existing data from database"""
+        """Load all existing data from the data source"""
         with self.lock:
             try:
-                conn = self.get_connection()
-                query = "SELECT * FROM underway_summary ORDER BY datetime_utc"
-                self.data = pd.read_sql_query(query, conn)
-                conn.close()
+                if self.is_parquet:
+                    self.data = pd.read_parquet(self.db_path, engine="pyarrow")
+                else:
+                    conn = self.get_connection()
+                    query = "SELECT * FROM underway_summary ORDER BY datetime_utc"
+                    self.data = pd.read_sql_query(query, conn)
+                    conn.close()
 
                 if not self.data.empty:
                     # Convert Unix timestamp to datetime
@@ -38,14 +44,19 @@ class DataManager:
             return pd.DataFrame()
 
         try:
-            conn = self.get_connection()
-            query = """
-            SELECT * FROM underway_summary 
-            WHERE datetime_utc > ? 
-            ORDER BY datetime_utc
-            """
-            new_data = pd.read_sql_query(query, conn, params=(self.last_datetime_utc,))
-            conn.close()
+            if self.is_parquet:
+                # Filter Parquet data for new entries
+                new_data = pd.read_parquet(self.db_path, engine="pyarrow")
+                new_data = new_data[new_data["datetime_utc"] > self.last_datetime_utc]
+            else:
+                conn = self.get_connection()
+                query = """
+                SELECT * FROM underway_summary 
+                WHERE datetime_utc > ? 
+                ORDER BY datetime_utc
+                """
+                new_data = pd.read_sql_query(query, conn, params=(self.last_datetime_utc,))
+                conn.close()
 
             if not new_data.empty:
                 # Convert Unix timestamp to datetime
@@ -76,6 +87,10 @@ class DataManager:
             data = data[data["timestamp"] >= start_time]
         if end_time:
             data = data[data["timestamp"] <= end_time]
+
+        # Remove 'partition' column if it exists
+        if "partition" in data.columns:
+            data = data.drop(columns=["partition"])
 
         # Resample if requested
         if resample_freq and not data.empty:

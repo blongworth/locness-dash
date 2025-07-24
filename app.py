@@ -21,7 +21,7 @@ config = toml_config.get("locness_dash", {})
 
 
 # Initialize data manager
-data_manager = DataManager(config["db_file_path"])
+data_manager = DataManager(config["file_path"])
 data_manager.load_initial_data()
 
 # Initialize Dash app
