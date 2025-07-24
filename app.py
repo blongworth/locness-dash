@@ -86,7 +86,7 @@ app.layout = html.Div([
                     options=[
                         {"label": "1 Minute", "value": "1min"},
                         {"label": "10 Minutes", "value": "10min"},
-                        {"label": "1 Hour", "value": "1H"},
+                        {"label": "1 Hour", "value": "1h"},
                     ],
                     value=config["default_resampling"],
                     clearable=False,
@@ -105,9 +105,9 @@ app.layout = html.Div([
         ),
     ], id="sidebar-container", style={"position": "fixed", "top": 60, "left": 0, "zIndex": 1000}),
     html.Div([
-        html.Div([dcc.Graph(id="timeseries-plot", style={"height": "500px"})]),
         html.Div([dcc.Graph(id="map-plot", style={"height": "500px"})]),
-    ], style={"marginLeft": "270px", "padding": "20px"}),
+        html.Div([dcc.Graph(id="timeseries-plot", style={"height": "500px"})]),
+    ], style={"marginLeft": "270px", "padding": "10px"}),
     dcc.Store(id="last-update-time"),
     dcc.Store(id="time-range-store"),
     dcc.Interval(

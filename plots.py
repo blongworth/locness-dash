@@ -33,7 +33,7 @@ def create_timeseries_plot(data, fields):
     fig.update_layout(
         height=150 + 200 * len(fields),
         showlegend=False,
-        margin=dict(t=10, b=10, l=10, r=10)  # Adjust margins to reduce whitespace
+        #margin=dict(t=10, b=10, l=10, r=10)  # Adjust margins to reduce whitespace
     )
     for i in range(1, len(fields) + 1):
         fig.update_xaxes(
