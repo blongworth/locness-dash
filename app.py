@@ -106,7 +106,7 @@ app.layout = html.Div([
                     step=1,
                     value=[0, 1],
                     marks={},
-                    tooltip={"placement": "bottom", "always_visible": True},
+                    tooltip={"placement": "bottom", "always_visible": False},
                     allowCross=False,
                 ),
                 html.Br(),
@@ -194,8 +194,8 @@ def update_time_slider(n, current_value):
         timestamps = pd.to_datetime(data_manager.data["timestamp"])
         min_ts = timestamps.min()
         max_ts = timestamps.max()
-        slider_min = 0
-        slider_max = len(timestamps) - 1
+        slider_min = int(min_ts.timestamp())
+        slider_max = int(max_ts.timestamp())
         marks = {
             slider_min: min_ts.strftime("%Y-%m-%d %H:%M"),
             slider_max: max_ts.strftime("%Y-%m-%d %H:%M"),
@@ -249,16 +249,17 @@ def update_plots(
     last_update,
     stored_time_range,
 ):
-    # Map slider indices to timestamps
+    # Map slider UNIX timestamps to actual timestamps in the data
     if not data_manager.data.empty and "timestamp" in data_manager.data.columns:
         timestamps = pd.to_datetime(data_manager.data["timestamp"])
-        slider_min = 0
-        slider_max = len(timestamps) - 1
+        slider_min = int(timestamps.min().timestamp())
+        slider_max = int(timestamps.max().timestamp())
         # Clamp slider values
-        start_idx = max(slider_min, min(time_range_slider[0], slider_max))
-        end_idx = max(slider_min, min(time_range_slider[1], slider_max))
-        start_time = timestamps.iloc[start_idx]
-        end_time = timestamps.iloc[end_idx]
+        start_ts = max(slider_min, min(time_range_slider[0], slider_max))
+        end_ts = max(slider_min, min(time_range_slider[1], slider_max))
+        # Find closest timestamps in the data
+        start_time = timestamps.iloc[(timestamps - pd.to_datetime(start_ts, unit="s")).abs().argmin()]
+        end_time = timestamps.iloc[(timestamps - pd.to_datetime(end_ts, unit="s")).abs().argmin()]
     else:
         start_time = None
         end_time = None
