@@ -191,19 +191,35 @@ def create_dispersal_plot(data):
         yaxis1_title="pH",  # Label for pH subplot
         yaxis2_title="Rho [ppb]",  # Label for Rho subplot
         legend=dict(
-            x=1,  # Move legend slightly to the left
+            x=1,  # Move legend back to right edge
             y=1,
             xanchor="right",
             yanchor="top",
             bgcolor="rgba(0,0,0,0)"  # Make the background transparent
         ),
-        #margin=dict(t=50, b=50, l=50, r=50)  # Fixed margins
+        margin=dict(t=50, b=50, l=50, r=50)  # Standard margins
     )
     
-    # Update x-axes to prevent resizing issues
-    dispersal_fig.update_xaxes(fixedrange=False, row=1, col=1)
-    dispersal_fig.update_xaxes(fixedrange=False, row=2, col=1)
-    dispersal_fig.update_yaxes(fixedrange=False, row=1, col=1)
-    dispersal_fig.update_yaxes(fixedrange=False, row=2, col=1)
+    # Update x-axes to add padding and prevent edge collision
+    dispersal_fig.update_xaxes(
+        row=1, col=1,
+        rangeslider=dict(visible=False),
+        type="date",
+        automargin=True
+    )
+    dispersal_fig.update_xaxes(
+        row=2, col=1,
+        rangeslider=dict(visible=False),
+        type="date",
+        automargin=True
+    )
+    
+    # Add some padding to prevent data from touching the edges
+    if not data.empty and "timestamp" in data.columns:
+        time_range = data["timestamp"].max() - data["timestamp"].min()
+        padding = time_range * 0.02  # 2% padding on each side
+        dispersal_fig.update_xaxes(
+            range=[data["timestamp"].min() - padding, data["timestamp"].max() + padding]
+        )
 
     return dispersal_fig
