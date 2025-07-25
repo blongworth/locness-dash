@@ -142,21 +142,21 @@ app.layout = html.Div([
                 html.Div([
                     html.Div([
                         html.Div(
-                            style={"display": "flex", "alignItems": "center", "height": "500px"},
+                            style={"display": "flex", "alignItems": "center", "height": "400px"},  # Reduced height
                             children=[
                                 dcc.Graph(id="timeseries-plot-dispersal", 
-                                          style={"height": "500px", "width": "75%", "flex": "0 0 75%"}),
+                                          style={"height": "400px", "width": "80%", "flex": "0 0 80%"}),
                                 html.Div(
                                     id="ph-value-box",
                                     style={
                                         "height": "200px",
-                                        "width": "20%",
+                                        "width": "150px",
                                         "textAlign": "center",
-                                        "padding": "20px",
+                                        "padding": "10px",
                                         "border": "1px solid #ddd",
                                         "background": "#f8f9fa",
-                                        "marginLeft": "20px",
-                                        "flex": "0 0 20%",
+                                        #"marginLeft": "20px",
+                                        #"flex": "0 0 15%",
                                     },
                                     children=[
                                         html.Div("pH (2min avg)", style={"fontSize": "16px", "marginBottom": "15px"}),
@@ -372,8 +372,8 @@ def update_ph_value_box(n_intervals):
     if not data_manager.data.empty and "ph_corrected_ma" in data_manager.data.columns:
         latest_ph = data_manager.data["ph_corrected_ma"].iloc[-1]
         color = "red" if latest_ph > 8 else "black"
-        return f"{latest_ph:.2f}", {"fontSize": "36px", "color": color, "fontWeight": "bold"}
-    return "No Data", {"fontSize": "36px", "color": "black", "fontWeight": "bold"}
+        return f"{latest_ph:.2f}", {"fontSize": "46px", "color": color, "fontWeight": "bold"}
+    return "No Data", {"fontSize": "46px", "color": "black", "fontWeight": "bold"}
 
 
 # Background thread to check for new data
