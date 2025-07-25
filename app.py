@@ -9,7 +9,7 @@ from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 
 from data import DataManager
-from plots import create_timeseries_plot, create_map_plot
+from plots import create_timeseries_plot, create_map_plot, create_dispersal_plot
 
 # TODO: Plot selection bug: selecting on plot filters data, can't zoom out
 # TODO: Fix "jump" on data update
@@ -131,9 +131,21 @@ app.layout = html.Div([
         ),
     ], id="sidebar-container", style={"position": "fixed", "top": 60, "left": 0, "zIndex": 1000}),
     html.Div([
-        html.Div([dcc.Graph(id="map-plot", style={"height": "500px"})]),
-        html.Div([dcc.Graph(id="timeseries-plot", style={"height": "500px"})]),
-    ], style={"marginLeft": "270px", "padding": "10px"}),
+        dcc.Tabs([
+            dcc.Tab(label="Main View", children=[
+                html.Div([
+                    html.Div([dcc.Graph(id="map-plot", style={"height": "500px"})]),
+                    html.Div([dcc.Graph(id="timeseries-plot", style={"height": "500px"})]),
+                ], style={"marginLeft": "270px", "padding": "10px"}),
+            ]),
+            dcc.Tab(label="Dispersal View", children=[
+                html.Div([
+                    html.Div([dcc.Graph(id="timeseries-plot-dispersal", style={"height": "500px"})]),
+                    html.Div([dcc.Graph(id="map-plot-dispersal", style={"height": "500px"})]),
+                ], style={"marginLeft": "270px", "padding": "10px"}),
+            ]),
+        ]),
+    ]),
     dcc.Store(id="last-update-time"),
     dcc.Store(id="time-range-store"),
     dcc.Interval(
@@ -231,6 +243,8 @@ def update_time_slider(n, current_value):
     [
         Output("timeseries-plot", "figure"),
         Output("map-plot", "figure"),
+        Output("timeseries-plot-dispersal", "figure"),
+        Output("map-plot-dispersal", "figure"),
         Output("time-range-store", "data"),
         Output("last-update-time", "data"),
         Output("last-update-display", "children"),
@@ -298,6 +312,9 @@ def update_plots(
             transition={'duration': 100}  # Disable animations to reduce visual jumps
         )
 
+    # Create a custom timeseries plot for the Dispersal View
+    dispersal_fig = create_dispersal_plot(data)
+
     # Get the most recent timestamp from the data
     most_recent_timestamp = data["timestamp"].max() if not data.empty else None
     most_recent_timestamp_iso = most_recent_timestamp.isoformat() if most_recent_timestamp else "N/A"
@@ -309,6 +326,8 @@ def update_plots(
     return (
         ts_fig,
         map_fig,
+        dispersal_fig,  # Custom figure for dispersal view
+        map_fig,  # Reuse the same map figure for dispersal view
         time_range,
         current_time,
         f"{current_time}",

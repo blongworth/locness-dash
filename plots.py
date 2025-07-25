@@ -1,5 +1,5 @@
-import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 
 def create_timeseries_plot(data, fields):
     """Create timeseries plot with subplots for multiple fields"""
@@ -143,3 +143,51 @@ def create_map_plot(df, field):
         margin=dict(t=10, b=10, l=10, r=10)  # Adjust margins to reduce whitespace
     )
     return fig
+
+def create_dispersal_plot(data):
+    dispersal_fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1)
+
+    if "ph_corrected" in data.columns and "ph_corrected_ma" in data.columns:
+        dispersal_fig.add_trace(
+            go.Scatter(
+                x=data["timestamp"],
+                y=data["ph_corrected"],
+                mode="lines",
+                name="pH Corrected",
+                line=dict(color="lightblue")
+            ),
+            row=1, col=1
+        )
+        dispersal_fig.add_trace(
+            go.Scatter(
+                x=data["timestamp"],
+                y=data["ph_corrected_ma"],
+                mode="lines",
+                name="pH Corrected (MA)",
+                line=dict(color="blue")
+            ),
+            row=1, col=1
+        )
+
+    if "rho_ppb" in data.columns:
+        dispersal_fig.add_trace(
+            go.Scatter(
+                x=data["timestamp"],
+                y=data["rho_ppb"],
+                mode="lines",
+                name="Rho (ppb)",
+                line=dict(color="green")
+            ),
+            row=2, col=1
+        )
+
+    dispersal_fig.update_layout(
+        height=800,
+        title="Dispersal View Timeseries",
+        uirevision="dispersal-timeseries-constant",
+        transition={'duration': 100},
+        xaxis_title="Timestamp",
+        yaxis_title="Values",
+    )
+
+    return dispersal_fig
