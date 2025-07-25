@@ -141,31 +141,26 @@ app.layout = html.Div([
             dcc.Tab(label="Dispersal View", children=[
                 html.Div([
                     html.Div([
+                        dcc.Graph(id="timeseries-plot-dispersal", style={"height": "100%", "width": "80%", "display": "inline-block", "verticalAlign": "middle"}),
                         html.Div(
-                            style={"display": "flex", "alignItems": "center", "height": "400px"},  # Reduced height
+                            id="ph-value-box",
+                            style={
+                                "height": "200px",
+                                "width": "150px",
+                                "display": "inline-block",
+                                "verticalAlign": "middle",
+                                "textAlign": "center",
+                                "padding": "10px",
+                                "border": "1px solid #ddd",
+                                "background": "#f8f9fa",
+                                "marginLeft": "20px",
+                            },
                             children=[
-                                dcc.Graph(id="timeseries-plot-dispersal", 
-                                          style={"height": "400px", "width": "80%", "flex": "0 0 80%"}),
-                                html.Div(
-                                    id="ph-value-box",
-                                    style={
-                                        "height": "200px",
-                                        "width": "150px",
-                                        "textAlign": "center",
-                                        "padding": "10px",
-                                        "border": "1px solid #ddd",
-                                        "background": "#f8f9fa",
-                                        #"marginLeft": "20px",
-                                        #"flex": "0 0 15%",
-                                    },
-                                    children=[
-                                        html.Div("pH (2min avg)", style={"fontSize": "16px", "marginBottom": "15px"}),
-                                        html.Div("No Data", id="ph-value", style={"fontSize": "36px", "color": "black", "fontWeight": "bold"}),
-                                    ],
-                                ),
-                            ]
-                        )
-                    ]),
+                                html.Div("pH (2min avg)", style={"fontSize": "16px", "marginBottom": "15px"}),
+                                html.Div("No Data", id="ph-value", style={"fontSize": "46px", "color": "black", "fontWeight": "bold"}),
+                            ],
+                        ),
+                    ], style={"height": "400px", "width": "100%", "marginBottom": "10px"}),
                     html.Div([dcc.Graph(id="map-plot-dispersal", style={"height": "500px"})]),
                 ], style={"marginLeft": "270px", "padding": "10px"}),
             ]),
