@@ -140,7 +140,32 @@ app.layout = html.Div([
             ]),
             dcc.Tab(label="Dispersal View", children=[
                 html.Div([
-                    html.Div([dcc.Graph(id="timeseries-plot-dispersal", style={"height": "500px"})]),
+                    html.Div([
+                        html.Div(
+                            style={"display": "flex", "alignItems": "center", "height": "500px"},
+                            children=[
+                                dcc.Graph(id="timeseries-plot-dispersal", 
+                                          style={"height": "500px", "width": "75%", "flex": "0 0 75%"}),
+                                html.Div(
+                                    id="ph-value-box",
+                                    style={
+                                        "height": "200px",
+                                        "width": "20%",
+                                        "textAlign": "center",
+                                        "padding": "20px",
+                                        "border": "1px solid #ddd",
+                                        "background": "#f8f9fa",
+                                        "marginLeft": "20px",
+                                        "flex": "0 0 20%",
+                                    },
+                                    children=[
+                                        html.Div("pH (2min avg)", style={"fontSize": "16px", "marginBottom": "15px"}),
+                                        html.Div("No Data", id="ph-value", style={"fontSize": "36px", "color": "black", "fontWeight": "bold"}),
+                                    ],
+                                ),
+                            ]
+                        )
+                    ]),
                     html.Div([dcc.Graph(id="map-plot-dispersal", style={"height": "500px"})]),
                 ], style={"marginLeft": "270px", "padding": "10px"}),
             ]),
@@ -335,6 +360,20 @@ def update_plots(
         f"{total_rows_all_data}",
         f"{total_rows_filtered}",
     )
+
+
+# Callback to update the pH value box
+@app.callback(
+    Output("ph-value", "children"),
+    Output("ph-value", "style"),
+    Input("interval-component", "n_intervals"),
+)
+def update_ph_value_box(n_intervals):
+    if not data_manager.data.empty and "ph_corrected_ma" in data_manager.data.columns:
+        latest_ph = data_manager.data["ph_corrected_ma"].iloc[-1]
+        color = "red" if latest_ph > 8 else "black"
+        return f"{latest_ph:.2f}", {"fontSize": "36px", "color": color, "fontWeight": "bold"}
+    return "No Data", {"fontSize": "36px", "color": "black", "fontWeight": "bold"}
 
 
 # Background thread to check for new data

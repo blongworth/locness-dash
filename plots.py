@@ -183,7 +183,7 @@ def create_dispersal_plot(data):
         )
 
     dispersal_fig.update_layout(
-        height=800,
+        height=500,  # Fixed height to match the container
         title="Dispersal View Timeseries",
         uirevision="dispersal-timeseries-constant",
         transition={'duration': 100},
@@ -196,7 +196,14 @@ def create_dispersal_plot(data):
             xanchor="right",
             yanchor="top",
             bgcolor="rgba(0,0,0,0)"  # Make the background transparent
-        )
+        ),
+        #margin=dict(t=50, b=50, l=50, r=50)  # Fixed margins
     )
+    
+    # Update x-axes to prevent resizing issues
+    dispersal_fig.update_xaxes(fixedrange=False, row=1, col=1)
+    dispersal_fig.update_xaxes(fixedrange=False, row=2, col=1)
+    dispersal_fig.update_yaxes(fixedrange=False, row=1, col=1)
+    dispersal_fig.update_yaxes(fixedrange=False, row=2, col=1)
 
     return dispersal_fig
