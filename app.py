@@ -110,8 +110,16 @@ app.layout = html.Div([
                     allowCross=False,
                 ),
                 html.Br(),
-                html.Div(id="last-update-display", style={"marginTop": "10px"}),
-                html.Div(id="most-recent-timestamp-display", style={"marginTop": "10px"}),
+                html.Div([
+                    html.Label("Last update:"),
+                    html.P(id="last-update-display"),
+                    html.Label("Last timestamp:"),
+                    html.P(id="most-recent-timestamp-display"),
+                    html.Label("Total rows (all data):"),
+                    html.P(id="total-rows-all-data"),
+                    html.Label("Total rows (filtered):"),
+                    html.P(id="total-rows-filtered"),
+                ])
             ],
             style={
                 "width": "250px",
@@ -227,6 +235,8 @@ def update_time_slider(n, current_value):
         Output("last-update-time", "data"),
         Output("last-update-display", "children"),
         Output("most-recent-timestamp-display", "children"),
+        Output("total-rows-all-data", "children"),
+        Output("total-rows-filtered", "children"),
     ],
     [
         Input("interval-component", "n_intervals"),
@@ -267,6 +277,10 @@ def update_plots(
 
     data = data_manager.get_data(start_time, end_time, resample_freq)
 
+    # Calculate total rows
+    total_rows_all_data = len(data_manager.data)
+    total_rows_filtered = len(data)
+
     # Create plots with uirevision set from the beginning
     ts_fig = create_timeseries_plot(data, ts_fields or [])
     map_fig = create_map_plot(data, map_field)
@@ -275,13 +289,13 @@ def update_plots(
     if ts_fig:
         ts_fig.update_layout(
             uirevision="timeseries-constant",
-            transition={'duration': 0}  # Disable animations to reduce visual jumps
+            transition={'duration': 100}  # Disable animations to reduce visual jumps
         )
     
     if map_fig:
         map_fig.update_layout(
             uirevision="map-constant",
-            transition={'duration': 0}  # Disable animations to reduce visual jumps
+            transition={'duration': 100}  # Disable animations to reduce visual jumps
         )
 
     # Get the most recent timestamp from the data
@@ -297,8 +311,10 @@ def update_plots(
         map_fig,
         time_range,
         current_time,
-        f"Last Update: {current_time}",
-        f"Most Recent Data Timestamp: {most_recent_timestamp_iso}",
+        f"{current_time}",
+        f"{most_recent_timestamp_iso}",
+        f"{total_rows_all_data}",
+        f"{total_rows_filtered}",
     )
 
 
