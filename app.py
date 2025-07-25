@@ -268,9 +268,17 @@ def update_plots(
 
     # Create timeseries plot
     ts_fig = create_timeseries_plot(data, ts_fields or [])
-
+    
     # Create map plot
     map_fig = create_map_plot(data, map_field)
+
+    # Use uirevision to maintain view state across updates
+    # This is the proper way to preserve zoom/pan state in Plotly
+    if ts_fig:
+        ts_fig.update_layout(uirevision="timeseries-constant")
+    
+    if map_fig:
+        map_fig.update_layout(uirevision="map-constant")
 
     # Get the most recent timestamp from the data
     most_recent_timestamp = data["timestamp"].max() if not data.empty else None
