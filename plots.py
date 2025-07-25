@@ -48,7 +48,7 @@ def create_timeseries_plot(data, fields):
                     dict(step="all")
                 ])
             ) if i == 1 else None,
-            rangeslider=dict(visible=(i == len(fields))),
+            rangeslider=dict(visible=False),  # Disable rangeslider to prevent compression issues
             type="date"
         )
     return fig

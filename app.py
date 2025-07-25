@@ -238,7 +238,8 @@ def update_time_slider(n, current_value):
     [
         State("last-update-time", "data"),
         State("time-range-store", "data"),
-    ]
+    ],
+    prevent_initial_call=True
 )
 def update_plots(
     n_intervals,
@@ -266,19 +267,22 @@ def update_plots(
 
     data = data_manager.get_data(start_time, end_time, resample_freq)
 
-    # Create timeseries plot
+    # Create plots with uirevision set from the beginning
     ts_fig = create_timeseries_plot(data, ts_fields or [])
-    
-    # Create map plot
     map_fig = create_map_plot(data, map_field)
 
-    # Use uirevision to maintain view state across updates
-    # This is the proper way to preserve zoom/pan state in Plotly
+    # Set uirevision immediately during creation to minimize jumps
     if ts_fig:
-        ts_fig.update_layout(uirevision="timeseries-constant")
+        ts_fig.update_layout(
+            uirevision="timeseries-constant",
+            transition={'duration': 0}  # Disable animations to reduce visual jumps
+        )
     
     if map_fig:
-        map_fig.update_layout(uirevision="map-constant")
+        map_fig.update_layout(
+            uirevision="map-constant",
+            transition={'duration': 0}  # Disable animations to reduce visual jumps
+        )
 
     # Get the most recent timestamp from the data
     most_recent_timestamp = data["timestamp"].max() if not data.empty else None
