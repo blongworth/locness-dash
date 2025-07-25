@@ -98,6 +98,18 @@ app.layout = html.Div([
                     clearable=False,
                 ),
                 html.Br(),
+                html.Label("Time Range:"),
+                dcc.RangeSlider(
+                    id="time-range-slider",
+                    min=0,
+                    max=1,
+                    step=1,
+                    value=[0, 1],
+                    marks={},
+                    tooltip={"placement": "bottom", "always_visible": True},
+                    allowCross=False,
+                ),
+                html.Br(),
                 html.Div(id="last-update-display", style={"marginTop": "10px"}),
                 html.Div(id="most-recent-timestamp-display", style={"marginTop": "10px"}),
             ],
@@ -166,6 +178,45 @@ def update_dropdown_options(n, ts_value, map_value):
 
     return ts_options, ts_value_out, map_options, map_value_out
 
+# Callback to update time range slider properties
+@app.callback(
+    [
+        Output("time-range-slider", "min"),
+        Output("time-range-slider", "max"),
+        Output("time-range-slider", "marks"),
+        Output("time-range-slider", "value"),
+    ],
+    [Input("interval-component", "n_intervals")],
+    [State("time-range-slider", "value")]
+)
+def update_time_slider(n, current_value):
+    if not data_manager.data.empty and "timestamp" in data_manager.data.columns:
+        timestamps = pd.to_datetime(data_manager.data["timestamp"])
+        min_ts = timestamps.min()
+        max_ts = timestamps.max()
+        slider_min = 0
+        slider_max = len(timestamps) - 1
+        marks = {
+            slider_min: min_ts.strftime("%Y-%m-%d %H:%M"),
+            slider_max: max_ts.strftime("%Y-%m-%d %H:%M"),
+        }
+        # If current_value is valid, preserve it
+        if (
+            isinstance(current_value, list)
+            and len(current_value) == 2
+            and slider_min <= current_value[0] <= slider_max
+            and slider_min <= current_value[1] <= slider_max
+        ):
+            slider_value = current_value
+        else:
+            slider_value = [slider_min, slider_max]
+    else:
+        slider_min = 0
+        slider_max = 1
+        marks = {}
+        slider_value = [0, 1]
+    return slider_min, slider_max, marks, slider_value
+
 
 # Callback to update plots
 @app.callback(
@@ -182,33 +233,35 @@ def update_dropdown_options(n, ts_value, map_value):
         Input("timeseries-fields-dropdown", "value"),
         Input("map-field-dropdown", "value"),
         Input("resample-dropdown", "value"),
+        Input("time-range-slider", "value"),
     ],
     [
-        State("timeseries-plot", "relayoutData"),
         State("last-update-time", "data"),
         State("time-range-store", "data"),
-    ],
+    ]
 )
 def update_plots(
     n_intervals,
     ts_fields,
     map_field,
     resample_freq,
-    relayout_data,
+    time_range_slider,
     last_update,
     stored_time_range,
 ):
-    # Get time range from timeseries plot
-    time_range = stored_time_range
-    if relayout_data and "xaxis.range[0]" in relayout_data:
-        time_range = {
-            "start": relayout_data["xaxis.range[0]"],
-            "end": relayout_data["xaxis.range[1]"],
-        }
-
-    # Get data
-    start_time = pd.to_datetime(time_range["start"]) if time_range else None
-    end_time = pd.to_datetime(time_range["end"]) if time_range else None
+    # Map slider indices to timestamps
+    if not data_manager.data.empty and "timestamp" in data_manager.data.columns:
+        timestamps = pd.to_datetime(data_manager.data["timestamp"])
+        slider_min = 0
+        slider_max = len(timestamps) - 1
+        # Clamp slider values
+        start_idx = max(slider_min, min(time_range_slider[0], slider_max))
+        end_idx = max(slider_min, min(time_range_slider[1], slider_max))
+        start_time = timestamps.iloc[start_idx]
+        end_time = timestamps.iloc[end_idx]
+    else:
+        start_time = None
+        end_time = None
 
     data = data_manager.get_data(start_time, end_time, resample_freq)
 
@@ -224,6 +277,8 @@ def update_plots(
 
     current_time = datetime.now().replace(microsecond=0).isoformat()
 
+    # Return selected time range
+    time_range = {"start": str(start_time), "end": str(end_time)} if start_time and end_time else None
     return (
         ts_fig,
         map_fig,
