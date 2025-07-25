@@ -153,7 +153,7 @@ def create_dispersal_plot(data):
                 x=data["timestamp"],
                 y=data["ph_corrected"],
                 mode="lines",
-                name="pH Corrected",
+                name="pH",
                 line=dict(color="lightblue")
             ),
             row=1, col=1
@@ -163,7 +163,7 @@ def create_dispersal_plot(data):
                 x=data["timestamp"],
                 y=data["ph_corrected_ma"],
                 mode="lines",
-                name="pH Corrected (MA)",
+                name="pH (2 min avg)",
                 line=dict(color="blue")
             ),
             row=1, col=1
@@ -176,7 +176,8 @@ def create_dispersal_plot(data):
                 y=data["rho_ppb"],
                 mode="lines",
                 name="Rho (ppb)",
-                line=dict(color="green")
+                line=dict(color="red"),
+                showlegend=False  # Hide legend for rho_ppb
             ),
             row=2, col=1
         )
@@ -187,7 +188,15 @@ def create_dispersal_plot(data):
         uirevision="dispersal-timeseries-constant",
         transition={'duration': 100},
         xaxis_title="Timestamp",
-        yaxis_title="Values",
+        yaxis1_title="pH",  # Label for pH subplot
+        yaxis2_title="Rho [ppb]",  # Label for Rho subplot
+        legend=dict(
+            x=1,  # Move legend slightly to the left
+            y=1,
+            xanchor="right",
+            yanchor="top",
+            bgcolor="rgba(0,0,0,0)"  # Make the background transparent
+        )
     )
 
     return dispersal_fig
