@@ -196,7 +196,7 @@ def create_dispersal_plot(data):
         )
 
     dispersal_fig.update_layout(
-        height=500,  # Fixed height to match the container
+        #height=500,  # Fixed height to match the container
         title="Dispersal View Timeseries",
         uirevision="dispersal-timeseries-constant",
         transition={'duration': 100},

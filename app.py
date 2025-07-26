@@ -134,8 +134,8 @@ app.layout = html.Div([
         dcc.Tabs([
             dcc.Tab(label="Main View", value="Main View", children=[
                 html.Div([
-                    html.Div([dcc.Graph(id="map-plot", style={"height": "500px"})]),
-                    html.Div([dcc.Graph(id="timeseries-plot", style={"height": "500px"})]),
+                    html.Div([dcc.Graph(id="map-plot")]),
+                    html.Div([dcc.Graph(id="timeseries-plot")]),
                 ], style={"marginLeft": "270px", "padding": "10px"}),
             ]),
             dcc.Tab(label="Dispersal View", value="Dispersal View", children=[
@@ -328,7 +328,6 @@ def update_time_slider(n, current_value):
         State("last-update-time", "data"),
         State("time-range-store", "data"),
     ],
-    prevent_initial_call=True
 )
 def update_plots(
     n_intervals,
