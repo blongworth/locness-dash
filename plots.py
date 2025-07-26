@@ -57,6 +57,32 @@ def create_map_plot(df, field):
     if df.empty:
         return go.Figure()
     track_data = df
+
+    # Calculate zoom and center BEFORE creating the map figure
+    if not track_data.empty:
+        min_lat = track_data['latitude'].min()
+        max_lat = track_data['latitude'].max()
+        min_lon = track_data['longitude'].min()
+        max_lon = track_data['longitude'].max()
+        center_lat = (min_lat + max_lat) / 2
+        center_lon = (min_lon + max_lon) / 2
+        lat_range = max_lat - min_lat
+        lon_range = max_lon - min_lon
+        max_range = max(lat_range, lon_range)
+        if max_range < 0.002:
+            zoom = 15
+        elif max_range < 0.01:
+            zoom = 13
+        elif max_range < 0.05:
+            zoom = 11
+        elif max_range < 0.2:
+            zoom = 9
+        else:
+            zoom = 7
+    else:
+        center_lat, center_lon = 42.3601, -71.0589
+        zoom = 12
+
     fig = go.Figure()
     if field and field in track_data.columns:
         color_param = field
@@ -110,37 +136,23 @@ def create_map_plot(df, field):
                          f'Rho: {latest["rho_ppb"]:.1f} ppb<br>' +
                          f'Average pH: {latest["ph_corrected_ma"]:.2f}<extra></extra>'
         ))
-    if not track_data.empty:
-        min_lat = track_data['latitude'].min()
-        max_lat = track_data['latitude'].max()
-        min_lon = track_data['longitude'].min()
-        max_lon = track_data['longitude'].max()
-        center_lat = (min_lat + max_lat) / 2
-        center_lon = (min_lon + max_lon) / 2
-        lat_range = max_lat - min_lat
-        lon_range = max_lon - min_lon
-        max_range = max(lat_range, lon_range)
-        if max_range < 0.002:
-            zoom = 15
-        elif max_range < 0.01:
-            zoom = 13
-        elif max_range < 0.05:
-            zoom = 11
-        elif max_range < 0.2:
-            zoom = 9
-        else:
-            zoom = 7
-    else:
-        center_lat, center_lon = 42.3601, -71.0589
-        zoom = 12
     fig.update_layout(
         map=dict(
             style="dark",
             center=dict(lat=center_lat, lon=center_lon),
             zoom=zoom
         ),
-        height=650,
-        margin=dict(t=10, b=10, l=10, r=10)  # Adjust margins to reduce whitespace
+        margin=dict(t=10, b=10, l=10, r=10),  # Adjust margins to reduce whitespace
+        legend=dict(
+            x=0.99,
+            y=0.99,
+            xanchor="right",
+            yanchor="top",
+            bgcolor="rgba(255,255,255,0.7)",
+            bordercolor="rgba(0,0,0,0.2)",
+            borderwidth=1,
+            font=dict(size=13)
+        )
     )
     return fig
 

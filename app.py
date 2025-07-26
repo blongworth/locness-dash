@@ -132,21 +132,23 @@ app.layout = html.Div([
     ], id="sidebar-container", style={"position": "fixed", "top": 60, "left": 0, "zIndex": 1000}),
     html.Div([
         dcc.Tabs([
-            dcc.Tab(label="Main View", children=[
+            dcc.Tab(label="Main View", value="Main View", children=[
                 html.Div([
                     html.Div([dcc.Graph(id="map-plot", style={"height": "500px"})]),
                     html.Div([dcc.Graph(id="timeseries-plot", style={"height": "500px"})]),
                 ], style={"marginLeft": "270px", "padding": "10px"}),
             ]),
-            dcc.Tab(label="Dispersal View", children=[
+            dcc.Tab(label="Dispersal View", value="Dispersal View", children=[
                 html.Div([
                     html.Div([
-                        dcc.Graph(id="timeseries-plot-dispersal", style={"height": "100%", "width": "80%", "display": "inline-block", "verticalAlign": "middle"}),
+                        dcc.Graph(id="timeseries-plot-dispersal", style={"height": "100%", "width": "80%", "minHeight": "200px", "minWidth": "600px", "display": "inline-block", "verticalAlign": "middle"}),
                         html.Div(
                             id="ph-value-box",
                             style={
-                                "height": "200px",
+                                "height": "100%",
+                                "minHeight": "100px",
                                 "width": "150px",
+                                "minWidth": "150px",
                                 "display": "inline-block",
                                 "verticalAlign": "middle",
                                 "textAlign": "center",
@@ -160,11 +162,13 @@ app.layout = html.Div([
                                 html.Div("No Data", id="ph-value", style={"fontSize": "46px", "color": "black", "fontWeight": "bold"}),
                             ],
                         ),
-                    ], style={"height": "400px", "width": "100%", "marginBottom": "10px"}),
-                    html.Div([dcc.Graph(id="map-plot-dispersal", style={"height": "500px"})]),
+                    ], style={"height": "30vh", "minHeight": "150px", "width": "100%", "marginBottom": "10px", "display": "flex", "alignItems": "center"}),
+                    html.Div([
+                        dcc.Graph(id="map-plot-dispersal", style={"height": "100%", "minHeight": "200px", "width": "100%"})
+                    ], style={"height": "50vh", "minHeight": "200px", "width": "100%"}),
                 ], style={"marginLeft": "270px", "padding": "10px"}),
             ]),
-        ]),
+        ], id="main-tabs", value="Dispersal View"),
     ]),
     dcc.Store(id="last-update-time"),
     dcc.Store(id="time-range-store"),
