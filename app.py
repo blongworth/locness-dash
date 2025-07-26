@@ -90,6 +90,8 @@ app.layout = html.Div([
                 dcc.Dropdown(
                     id="resample-dropdown",
                     options=[
+                        # {"label": "No Resampling", "value": "None"}, # intolerable
+                        {"label": "10 Seconds", "value": "10s"}, # slow
                         {"label": "1 Minute", "value": "1min"},
                         {"label": "10 Minutes", "value": "10min"},
                         {"label": "1 Hour", "value": "1h"},
@@ -353,7 +355,11 @@ def update_plots(
         start_time = None
         end_time = None
 
-    data = data_manager.get_data(start_time, end_time, resample_freq)
+    # Add check for resample_freq is None
+    if resample_freq == "None":
+        data = data_manager.get_data(start_time, end_time)
+    else:
+        data = data_manager.get_data(start_time, end_time, resample_freq)
 
     # Calculate total rows
     total_rows_all_data = len(data_manager.data)
