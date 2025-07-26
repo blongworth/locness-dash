@@ -12,7 +12,6 @@ def create_timeseries_plot(data, fields):
         rows=n_fields,
         cols=1,
         shared_xaxes=True,
-        subplot_titles=fields,
         vertical_spacing=0.05,
     )
 
@@ -29,6 +28,8 @@ def create_timeseries_plot(data, fields):
                 ),
                 row=i + 1, col=1,
             )
+            # Set y axis title for each subplot
+            fig.update_yaxes(title_text=field, row=i + 1, col=1)
 
     fig.update_layout(
         height=150 + 200 * len(fields),
