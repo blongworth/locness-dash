@@ -199,7 +199,7 @@ def create_dispersal_plot(data):
         title="Dispersal View Timeseries",
         uirevision="dispersal-timeseries-constant",
         transition={'duration': 100},
-        xaxis_title="Timestamp",
+        #xaxis_title="Timestamp",
         yaxis1_title="pH",  # Label for pH subplot
         yaxis2_title="Rho [ppb]",  # Label for Rho subplot
         legend=dict(
