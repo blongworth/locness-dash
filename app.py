@@ -141,28 +141,69 @@ app.layout = html.Div([
             dcc.Tab(label="Dispersal View", value="Dispersal View", children=[
                 html.Div([
                     html.Div([
-                        dcc.Graph(id="timeseries-plot-dispersal", style={"height": "100%", "width": "80%", "minHeight": "200px", "minWidth": "600px", "display": "inline-block", "verticalAlign": "middle"}),
-                        html.Div(
-                            id="ph-value-box",
+                        dcc.Graph(
+                            id="timeseries-plot-dispersal",
                             style={
                                 "height": "100%",
-                                "minHeight": "100px",
-                                "width": "150px",
-                                "minWidth": "150px",
+                                "width": "80%",
+                                "minHeight": "200px",
+                                "minWidth": "600px",
                                 "display": "inline-block",
                                 "verticalAlign": "middle",
-                                "textAlign": "center",
-                                "padding": "10px",
-                                "border": "1px solid #ddd",
-                                "background": "#f8f9fa",
+                            },
+                        ),
+                        html.Div(
+                            [
+                                html.Div(
+                                    id="ph-value-box",
+                                    style={
+                                        "height": "120px",
+                                        "width": "150px",
+                                        "display": "flex",
+                                        "flexDirection": "column",
+                                        "alignItems": "center",
+                                        "justifyContent": "center",
+                                        "textAlign": "center",
+                                        "padding": "10px",
+                                        "border": "1px solid #ddd",
+                                        "background": "#f8f9fa",
+                                        "marginBottom": "20px",
+                                    },
+                                    children=[
+                                        html.Div("pH (2min avg)", style={"fontSize": "16px", "marginBottom": "10px"}),
+                                        html.Div("No Data", id="ph-value", style={"fontSize": "46px", "color": "black", "fontWeight": "bold"}),
+                                    ],
+                                ),
+                                html.Div(
+                                    id="rho-value-box",
+                                    style={
+                                        "height": "120px",
+                                        "width": "150px",
+                                        "display": "flex",
+                                        "flexDirection": "column",
+                                        "alignItems": "center",
+                                        "justifyContent": "center",
+                                        "textAlign": "center",
+                                        "padding": "10px",
+                                        "border": "1px solid #ddd",
+                                        "background": "#f8f9fa",
+                                    },
+                                    children=[
+                                        html.Div("Rho (ppb)", style={"fontSize": "16px", "marginBottom": "10px"}),
+                                        html.Div("No Data", id="rho-value", style={"fontSize": "46px", "color": "black", "fontWeight": "bold"}),
+                                    ],
+                                ),
+                            ],
+                            style={
+                                "display": "flex",
+                                "flexDirection": "column",
+                                "alignItems": "center",
+                                "justifyContent": "center",
+                                "height": "100%",
                                 "marginLeft": "20px",
                             },
-                            children=[
-                                html.Div("pH (2min avg)", style={"fontSize": "16px", "marginBottom": "15px"}),
-                                html.Div("No Data", id="ph-value", style={"fontSize": "46px", "color": "black", "fontWeight": "bold"}),
-                            ],
                         ),
-                    ], style={"height": "30vh", "minHeight": "150px", "width": "100%", "marginBottom": "10px", "display": "flex", "alignItems": "center"}),
+                    ], style={"height": "30vh", "minHeight": "150px", "width": "100%", "marginBottom": "10px", "display": "flex", "alignItems": "center", "justifyContent": "flex-start"}),
                     html.Div([
                         dcc.Graph(id="map-plot-dispersal", style={"height": "100%", "minHeight": "200px", "width": "100%"})
                     ], style={"height": "50vh", "minHeight": "200px", "width": "100%"}),
@@ -365,14 +406,24 @@ def update_plots(
 @app.callback(
     Output("ph-value", "children"),
     Output("ph-value", "style"),
+    Output("rho-value", "children"),
+    Output("rho-value", "style"),
     Input("interval-component", "n_intervals"),
 )
-def update_ph_value_box(n_intervals):
-    if not data_manager.data.empty and "ph_corrected_ma" in data_manager.data.columns:
-        latest_ph = data_manager.data["ph_corrected_ma"].iloc[-1]
-        color = "red" if latest_ph > 8 else "black"
-        return f"{latest_ph:.2f}", {"fontSize": "46px", "color": color, "fontWeight": "bold"}
-    return "No Data", {"fontSize": "46px", "color": "black", "fontWeight": "bold"}
+def update_value_boxes(n_intervals):
+    ph_val = "No Data"
+    ph_style = {"fontSize": "46px", "color": "black", "fontWeight": "bold"}
+    rho_val = "No Data"
+    rho_style = {"fontSize": "46px", "color": "black", "fontWeight": "bold"}
+    if not data_manager.data.empty:
+        if "ph_corrected_ma" in data_manager.data.columns:
+            latest_ph = data_manager.data["ph_corrected_ma"].iloc[-1]
+            ph_val = f"{latest_ph:.2f}"
+            ph_style = {"fontSize": "46px", "color": "red" if latest_ph > 8 else "black", "fontWeight": "bold"}
+        if "rho_ppb" in data_manager.data.columns:
+            latest_rho = data_manager.data["rho_ppb"].iloc[-1]
+            rho_val = f"{latest_rho:.1f}"
+    return ph_val, ph_style, rho_val, rho_style
 
 
 # Background thread to check for new data
