@@ -139,7 +139,7 @@ app.layout = html.Div([
                 html.Div([
                     html.Div([dcc.Graph(id="map-plot")]),
                     html.Div([dcc.Graph(id="timeseries-plot")]),
-                ], style={"marginLeft": "270px", "padding": "10px"}),
+                ], style={"padding": "10px"}),
             ]),
             dcc.Tab(label="Dispersal View", value="Dispersal View", children=[
                 html.Div([
@@ -210,18 +210,101 @@ app.layout = html.Div([
                     html.Div([
                         dcc.Graph(id="map-plot-dispersal", style={"height": "100%", "minHeight": "200px", "width": "100%"})
                     ], style={"height": "50vh", "minHeight": "200px", "width": "100%"}),
-                ], style={"marginLeft": "270px", "padding": "10px"}),
+                ], style={"padding": "10px"}),
+            ]),
+            dcc.Tab(label="Correlation", value="Correlation", children=[
+                html.Div([
+                    html.Div([
+                        dcc.Graph(id="correlation-scatterplot")
+                    ], style={"width": "100%", "padding": "10px"}),
+                    html.Div([
+                        html.Div([
+                            html.Label("X Axis:"),
+                            dcc.Dropdown(
+                                id="correlation-x-dropdown",
+                                options=[],
+                                value=None,
+                                placeholder="Select X variable",
+                            ),
+                        ], style={"flex": 1, "marginRight": "10px"}),
+                        html.Div([
+                            html.Label("Y Axis:"),
+                            dcc.Dropdown(
+                                id="correlation-y-dropdown",
+                                options=[],
+                                value=None,
+                                placeholder="Select Y variable",
+                            ),
+                        ], style={"flex": 1, "marginLeft": "10px"}),
+                    ], style={"display": "flex", "flexDirection": "row", "width": "700px", "padding": "20px", "background": "#f8f9fa", "borderTop": "1px solid #ddd", "margin": "0 auto"}),
+                ], style={"display": "flex", "flexDirection": "column", "alignItems": "center"}),
             ]),
         ], id="main-tabs", value="Dispersal View"),
-    ]),
-    dcc.Store(id="last-update-time"),
-    dcc.Store(id="time-range-store"),
-    dcc.Interval(
-        id="interval-component",
-        interval=config["update_interval"] * 1000,
-        n_intervals=0,
-    ),
+        dcc.Store(id="last-update-time"),
+        dcc.Store(id="time-range-store"),
+        dcc.Interval(
+            id="interval-component",
+            interval=config["update_interval"] * 1000,
+            n_intervals=0,
+        )
+    ], style={"marginLeft": "270px", "padding": "0px 10px 10px 10px", "minWidth": 0}),
 ])
+
+# Callback to update correlation dropdown options
+@app.callback(
+    [
+        Output("correlation-x-dropdown", "options"),
+        Output("correlation-x-dropdown", "value"),
+        Output("correlation-y-dropdown", "options"),
+        Output("correlation-y-dropdown", "value"),
+    ],
+    [Input("interval-component", "n_intervals")],
+    [
+        State("correlation-x-dropdown", "value"),
+        State("correlation-y-dropdown", "value"),
+    ]
+)
+def update_correlation_dropdowns(n, x_value, y_value):
+    if data_manager.data.empty:
+        return [], None, [], None
+    exclude = ["id", "datetime_utc", "timestamp"]
+    numeric_cols = [col for col in data_manager.data.columns if col not in exclude and data_manager.data[col].dtype in ["float64", "int64"]]
+    options = [{"label": col, "value": col} for col in numeric_cols]
+    # Set defaults if current value is not valid
+    x_out = x_value if x_value in numeric_cols else (numeric_cols[0] if numeric_cols else None)
+    y_out = y_value if y_value in numeric_cols else (numeric_cols[1] if len(numeric_cols) > 1 else None)
+    return options, x_out, options, y_out
+
+# Callback to update correlation scatterplot
+@app.callback(
+    Output("correlation-scatterplot", "figure"),
+    [
+        Input("interval-component", "n_intervals"),
+        Input("correlation-x-dropdown", "value"),
+        Input("correlation-y-dropdown", "value"),
+        Input("resample-dropdown", "value"),
+        Input("time-range-slider", "value"),
+    ]
+)
+def update_correlation_plot(n_intervals, x_col, y_col, resample_freq, time_range_slider):
+    if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns and x_col and y_col:
+        datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
+        slider_min = datetime_utcs.min().timestamp()
+        slider_max = datetime_utcs.max().timestamp()
+        start_ts = max(slider_min, min(time_range_slider[0], slider_max))
+        end_ts = slider_max
+        start_time = datetime.fromtimestamp(start_ts)
+        end_time = datetime.fromtimestamp(end_ts)
+        if resample_freq == "None":
+            data = data_manager.get_data(start_time, end_time)
+        else:
+            data = data_manager.get_data(start_time, end_time, resample_freq)
+        from plots import create_correlation_plot
+        fig = create_correlation_plot(data, x_col, y_col)
+        if fig:
+            fig.update_layout(uirevision="correlation-constant", transition={'duration': 100})
+        return fig
+    return {}
 
 
 # Callback to update dropdown options and set default values

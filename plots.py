@@ -235,3 +235,12 @@ def create_dispersal_plot(data):
         )
 
     return dispersal_fig
+
+def create_correlation_plot(data, x_col, y_col):
+    import plotly.express as px
+    if data is None or data.empty or x_col not in data.columns or y_col not in data.columns:
+        return {}
+    fig = px.scatter(data, x=x_col, y=y_col, title=f"Correlation: {x_col} vs {y_col}", opacity=0.7)
+    fig.update_traces(marker=dict(size=8, line=dict(width=1, color='DarkSlateGrey')))
+    fig.update_layout(margin=dict(l=40, r=20, t=40, b=40))
+    return fig
