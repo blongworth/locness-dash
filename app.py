@@ -4,9 +4,12 @@ import threading
 import time
 import pandas as pd
 
+
 import dash
 from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
+
+import plotly.graph_objects as go
 
 from data import DataManager
 from plots import create_timeseries_plot, create_map_plot, create_dispersal_plot
@@ -141,6 +144,11 @@ app.layout = html.Div([
                     html.Div([dcc.Graph(id="timeseries-plot")]),
                 ], style={"padding": "10px"}),
             ]),
+            dcc.Tab(label="All Fields Timeseries", value="All Fields Timeseries", children=[
+                html.Div([
+                    dcc.Graph(id="all-fields-timeseries-plot")
+                ], style={"padding": "10px"}),
+            ]),
             dcc.Tab(label="Dispersal View", value="Dispersal View", children=[
                 html.Div([
                     html.Div([
@@ -239,6 +247,7 @@ app.layout = html.Div([
                     ], style={"display": "flex", "flexDirection": "row", "width": "700px", "padding": "20px", "background": "#f8f9fa", "borderTop": "1px solid #ddd", "margin": "0 auto"}),
                 ], style={"display": "flex", "flexDirection": "column", "alignItems": "center"}),
             ]),
+
         ], id="main-tabs", value="Dispersal View"),
         dcc.Store(id="last-update-time"),
         dcc.Store(id="time-range-store"),
@@ -249,6 +258,7 @@ app.layout = html.Div([
         )
     ], style={"marginLeft": "270px", "padding": "0px 10px 10px 10px", "minWidth": 0}),
 ])
+
 
 # Callback to update correlation dropdown options
 @app.callback(
@@ -396,6 +406,7 @@ def update_time_slider(n, current_value):
         Output("map-plot", "figure"),
         Output("timeseries-plot-dispersal", "figure"),
         Output("map-plot-dispersal", "figure"),
+        Output("all-fields-timeseries-plot", "figure"),
         Output("time-range-store", "data"),
         Output("last-update-time", "data"),
         Output("last-update-display", "children"),
@@ -453,6 +464,11 @@ def update_plots(
     ts_fig = create_timeseries_plot(data, ts_fields or [])
     map_fig = create_map_plot(data, map_field)
 
+    # Exclude datetime_utc and index columns
+    exclude = ["datetime_utc", "index", "id"]
+    fields = [col for col in data.columns if col not in exclude]
+    all_ts_fig = create_timeseries_plot(data, fields)
+
     # Set uirevision immediately during creation to minimize jumps
     if ts_fig:
         ts_fig.update_layout(
@@ -482,6 +498,7 @@ def update_plots(
         map_fig,
         dispersal_fig,  # Custom figure for dispersal view
         map_fig,  # Reuse the same map figure for dispersal view
+        all_ts_fig,
         time_range,
         current_time,
         f"{current_time}",
