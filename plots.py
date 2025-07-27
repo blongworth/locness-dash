@@ -1,13 +1,14 @@
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
-def create_timeseries_plot(data, fields):
+def create_timeseries_plot(data, fields, subplot_height=200):
     """Create timeseries plot with subplots for multiple fields"""
     if data.empty or not fields:
         fig = go.Figure()
         return fig
 
     n_fields = len(fields)
+    
     fig = make_subplots(
         rows=n_fields,
         cols=1,
@@ -32,7 +33,7 @@ def create_timeseries_plot(data, fields):
             fig.update_yaxes(title_text=field, row=i + 1, col=1)
 
     fig.update_layout(
-        height=150 + 200 * len(fields),
+        height=150 + subplot_height * len(fields),
         showlegend=False,
         #margin=dict(t=10, b=10, l=10, r=10)  # Adjust margins to reduce whitespace
     )
