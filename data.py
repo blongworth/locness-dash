@@ -39,7 +39,6 @@ class DataManager:
 
                 if not self.data.empty:
                     # Set timestamp column (same as datetime_utc for consistency)
-                    self.data["timestamp"] = self.data["datetime_utc"]
                     self.last_datetime_utc = self.data["datetime_utc"].max()
 
             except Exception as e:
@@ -51,6 +50,7 @@ class DataManager:
         if self.last_datetime_utc is None:
             return pd.DataFrame()
 
+        print(f"Fetching new data after {self.last_datetime_utc} (UTC timestamp)")
         try:
             if self.is_parquet:
                 # Filter Parquet data for new entries
@@ -65,7 +65,6 @@ class DataManager:
                 conn = self.get_connection()
                 # Convert pandas datetime to Unix timestamp for SQLite query
                 last_datetime_unix = int(self.last_datetime_utc.timestamp())
-                print(f"Fetching new data after {last_datetime_unix} (UTC timestamp)")
                 query = """
                 SELECT * FROM underway_summary 
                 WHERE datetime_utc > ? 
@@ -80,13 +79,14 @@ class DataManager:
                     )
 
             if not new_data.empty:
-                # Set timestamp column (same as datetime_utc for consistency)
-                new_data["timestamp"] = new_data["datetime_utc"]
 
                 with self.lock:
                     self.data = pd.concat([self.data, new_data], ignore_index=True)
+                    # Update last_datetime_utc to the maximum datetime in the new data
                     self.last_datetime_utc = new_data["datetime_utc"].max()
-                    print(f"DataManager: data shape after append: {self.data.shape}")
+
+                print(f"DataManager: data shape after append: {self.data.shape}")
+                print(f"DataManager: last_datetime_utc updated to {self.last_datetime_utc}")
 
                 return new_data
         except Exception as e:
@@ -107,12 +107,12 @@ class DataManager:
             # Ensure start_time is a pandas datetime
             if not isinstance(start_time, pd.Timestamp):
                 start_time = pd.to_datetime(start_time)
-            data = data[data["timestamp"] >= start_time]
+            data = data[data["datetime_utc"] >= start_time]
         if end_time:
             # Ensure end_time is a pandas datetime
             if not isinstance(end_time, pd.Timestamp):
                 end_time = pd.to_datetime(end_time)
-            data = data[data["timestamp"] <= end_time]
+            data = data[data["datetime_utc"] <= end_time]
 
         # Remove 'partition' column if it exists
         if "partition" in data.columns:
@@ -120,7 +120,7 @@ class DataManager:
 
         # Resample if requested
         if resample_freq and not data.empty:
-            data.set_index("timestamp", inplace=True)
+            data.set_index("datetime_utc", inplace=True)
             resampled_data = data.resample(resample_freq).mean()
             resampled_data.reset_index(inplace=True)
             data = resampled_data

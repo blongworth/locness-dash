@@ -19,7 +19,7 @@ def create_timeseries_plot(data, fields):
         if field in data.columns:
             fig.add_trace(
                 go.Scatter(
-                    x=data["timestamp"],
+                    x=data["datetime_utc"],
                     y=data[field],
                     mode="lines+markers",
                     name=field,
@@ -163,7 +163,7 @@ def create_dispersal_plot(data):
     if "ph_corrected" in data.columns and "ph_corrected_ma" in data.columns:
         dispersal_fig.add_trace(
             go.Scatter(
-                x=data["timestamp"],
+                x=data["datetime_utc"],
                 y=data["ph_corrected"],
                 mode="lines",
                 name="pH",
@@ -173,7 +173,7 @@ def create_dispersal_plot(data):
         )
         dispersal_fig.add_trace(
             go.Scatter(
-                x=data["timestamp"],
+                x=data["datetime_utc"],
                 y=data["ph_corrected_ma"],
                 mode="lines",
                 name="pH (2 min avg)",
@@ -185,7 +185,7 @@ def create_dispersal_plot(data):
     if "rho_ppb" in data.columns:
         dispersal_fig.add_trace(
             go.Scatter(
-                x=data["timestamp"],
+                x=data["datetime_utc"],
                 y=data["rho_ppb"],
                 mode="lines",
                 name="Rho (ppb)",
@@ -200,7 +200,6 @@ def create_dispersal_plot(data):
         title="Dispersal View Timeseries",
         uirevision="dispersal-timeseries-constant",
         transition={'duration': 100},
-        #xaxis_title="Timestamp",
         yaxis1_title="pH",  # Label for pH subplot
         yaxis2_title="Rho [ppb]",  # Label for Rho subplot
         legend=dict(
@@ -228,11 +227,11 @@ def create_dispersal_plot(data):
     )
     
     # Add some padding to prevent data from touching the edges
-    if not data.empty and "timestamp" in data.columns:
-        time_range = data["timestamp"].max() - data["timestamp"].min()
+    if not data.empty and "datetime_utc" in data.columns:
+        time_range = data["datetime_utc"].max() - data["datetime_utc"].min()
         padding = time_range * 0.02  # 2% padding on each side
         dispersal_fig.update_xaxes(
-            range=[data["timestamp"].min() - padding, data["timestamp"].max() + padding]
+            range=[data["datetime_utc"].min() - padding, data["datetime_utc"].max() + padding]
         )
 
     return dispersal_fig

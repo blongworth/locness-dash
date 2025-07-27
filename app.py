@@ -278,15 +278,15 @@ def update_dropdown_options(n, ts_value, map_value):
     [State("time-range-slider", "value")]
 )
 def update_time_slider(n, current_value):
-    if not data_manager.data.empty and "timestamp" in data_manager.data.columns:
-        timestamps = pd.to_datetime(data_manager.data["timestamp"])
-        min_ts = timestamps.min()
-        max_ts = timestamps.max()
-        slider_min = int(min_ts.timestamp())
-        slider_max = int(max_ts.timestamp())
+    if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns:
+        datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
+        min_ts = datetime_utcs.min().timestamp()
+        max_ts = datetime_utcs.max().timestamp()
+        slider_min = int(min_ts)
+        slider_max = int(max_ts)
         marks = {
-            slider_min: min_ts.strftime("%Y-%m-%d %H:%M"),
-            slider_max: max_ts.strftime("%Y-%m-%d %H:%M"),
+            slider_min: datetime.fromtimestamp(slider_min).strftime("%Y-%m-%d %H:%M"),
+            slider_max: datetime.fromtimestamp(slider_max).strftime("%Y-%m-%d %H:%M"),
         }
         # If current_value is valid, preserve it
         if (
@@ -341,17 +341,16 @@ def update_plots(
     last_update,
     stored_time_range,
 ):
-    # Map slider UNIX timestamps to actual timestamps in the data
-    if not data_manager.data.empty and "timestamp" in data_manager.data.columns:
-        timestamps = pd.to_datetime(data_manager.data["timestamp"])
-        slider_min = int(timestamps.min().timestamp())
-        slider_max = int(timestamps.max().timestamp())
+    if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns:
+        datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
+        slider_min = datetime_utcs.min().timestamp()
+        slider_max = datetime_utcs.max().timestamp()
         # Clamp slider values
         start_ts = max(slider_min, min(time_range_slider[0], slider_max))
         end_ts = max(slider_min, min(time_range_slider[1], slider_max))
-        # Find closest timestamps in the data
-        start_time = timestamps.iloc[(timestamps - pd.to_datetime(start_ts, unit="s")).abs().argmin()]
-        end_time = timestamps.iloc[(timestamps - pd.to_datetime(end_ts, unit="s")).abs().argmin()]
+        # Convert Unix timestamps to datetime
+        start_time = datetime.fromtimestamp(start_ts)
+        end_time = datetime.fromtimestamp(end_ts)
     else:
         start_time = None
         end_time = None
@@ -376,7 +375,7 @@ def update_plots(
             uirevision="timeseries-constant",
             transition={'duration': 100}  # Disable animations to reduce visual jumps
         )
-    
+
     if map_fig:
         map_fig.update_layout(
             uirevision="map-constant",
@@ -387,7 +386,7 @@ def update_plots(
     dispersal_fig = create_dispersal_plot(data)
 
     # Get the most recent timestamp from the data
-    most_recent_timestamp = data["timestamp"].max() if not data.empty else None
+    most_recent_timestamp = data["datetime_utc"].max() if not data.empty else None
     most_recent_timestamp_iso = most_recent_timestamp.isoformat() if most_recent_timestamp else "N/A"
 
     current_time = datetime.now().replace(microsecond=0).isoformat()
