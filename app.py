@@ -347,7 +347,8 @@ def update_plots(
         slider_max = datetime_utcs.max().timestamp()
         # Clamp slider values
         start_ts = max(slider_min, min(time_range_slider[0], slider_max))
-        end_ts = max(slider_min, min(time_range_slider[1], slider_max))
+        end_ts = slider_max
+        #end_ts = max(slider_min, min(time_range_slider[1], slider_max))
         # Convert Unix timestamps to datetime
         start_time = datetime.fromtimestamp(start_ts)
         end_time = datetime.fromtimestamp(end_ts)
@@ -386,7 +387,7 @@ def update_plots(
     dispersal_fig = create_dispersal_plot(data)
 
     # Get the most recent timestamp from the data
-    most_recent_timestamp = data["datetime_utc"].max() if not data.empty else None
+    most_recent_timestamp = data_manager.data["datetime_utc"].max() if not data_manager.data.empty else None
     most_recent_timestamp_iso = most_recent_timestamp.isoformat() if most_recent_timestamp else "N/A"
 
     current_time = datetime.now().replace(microsecond=0).isoformat()
