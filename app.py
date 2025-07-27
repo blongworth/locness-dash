@@ -17,6 +17,7 @@ from plots import create_timeseries_plot, create_map_plot, create_dispersal_plot
 # TODO: Dispersal View
 # TODO: Diagnostics View
 # TODO: Property plot view
+# TODO: calculate ph ma here and compare to ph_corrected_ma
 
 # Load configuration from config.toml
 with open("config.toml", "rb") as f:
@@ -27,7 +28,7 @@ config = toml_config.get("locness_dash", {})
 
 
 # Initialize data manager
-data_manager = DataManager(config["file_path"])
+data_manager = DataManager(config["data_path"])
 data_manager.load_initial_data()
 
 # Initialize Dash app
@@ -438,6 +439,8 @@ def background_update():
         new_data = data_manager.get_new_data()
         if not new_data.empty:
             print(f"Retrieved {len(new_data)} new records")
+        else:
+            print("No new data available")
 
 
 # Start background thread

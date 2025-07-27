@@ -6,11 +6,11 @@ import random
 import time
 
 
-def create_sample_database(db_path="underway_data.db"):
+def create_sample_database(data_path="underway_data.db"):
     """Create sample SQLite database with ship underway data"""
 
     # Connect to SQLite database
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(data_path)
     cursor = conn.cursor()
 
     # Create table with the exact schema provided
@@ -111,9 +111,9 @@ def create_sample_database(db_path="underway_data.db"):
     conn.close()
 
 
-def add_new_data_point(db_path="underway_data.db"):
+def add_new_data_point(data_path="underway_data.db"):
     """Add a new data point (for simulating real-time ship data)"""
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(data_path)
     cursor = conn.cursor()
 
     # Get the latest timestamp and position
@@ -180,14 +180,14 @@ def add_new_data_point(db_path="underway_data.db"):
     )
 
 
-def continuous_data_simulation(db_path="underway_data.db", interval_seconds=10):
+def continuous_data_simulation(data_path="underway_data.db", interval_seconds=10):
     """Continuously add new data points to simulate real-time ship data"""
     print(f"Starting continuous data simulation (every {interval_seconds} seconds)")
     print("Press Ctrl+C to stop")
 
     try:
         while True:
-            add_new_data_point(db_path)
+            add_new_data_point(data_path)
             time.sleep(interval_seconds)
     except KeyboardInterrupt:
         print("\nStopping data simulation")
