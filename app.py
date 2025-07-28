@@ -4,22 +4,17 @@ import threading
 import time
 import pandas as pd
 
-
 import dash
 from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
-
-import plotly.graph_objects as go
+from dash_bootstrap_templates import ThemeSwitchAIO
 
 from data import DataManager
 from plots import create_timeseries_plot, create_map_plot, create_dispersal_plot
 
-# TODO: Plot selection bug: selecting on plot filters data, can't zoom out
-# TODO: Fix "jump" on data update
+# TODO: test automatic updates of all plots and data
 # TODO: Add data to traces rather than redrawing entire plot
-# TODO: Dispersal View
 # TODO: Diagnostics View
-# TODO: Property plot view
 # TODO: calculate ph ma here and compare to ph_corrected_ma
 
 # Load configuration from config.toml
@@ -35,8 +30,14 @@ data_manager = DataManager(config["data_path"])
 data_manager.load_initial_data()
 
 # Initialize Dash app
-external_stylesheets = [dbc.themes.BOOTSTRAP]
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+dark_theme = "darkly"
+light_theme = "bootstrap"
+url_dark_theme = dbc.themes.DARKLY
+url_light_theme = dbc.themes.BOOTSTRAP
+dbc_css = (
+    "https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates@V1.0.1/dbc.min.css"
+)
+app = dash.Dash(__name__, external_stylesheets=[url_light_theme, dbc_css])
 
 
 # Get available fields (excluding timestamp, datetime_utc and id columns)
@@ -73,6 +74,13 @@ app.layout = html.Div([
     html.Div([
         html.Div(
             [
+                ThemeSwitchAIO(
+                    aio_id="theme",
+                    themes=[
+                        url_light_theme,
+                        url_dark_theme,
+                    ],
+                ),
                 html.Label("Timeseries Fields:"),
                 dcc.Dropdown(
                     id="timeseries-fields-dropdown",
@@ -289,6 +297,7 @@ def update_correlation_dropdowns(n, x_value, y_value):
 @app.callback(
     Output("correlation-scatterplot", "figure"),
     [
+        Input(ThemeSwitchAIO.ids.switch("theme"), "value"),
         Input("interval-component", "n_intervals"),
         Input("correlation-x-dropdown", "value"),
         Input("correlation-y-dropdown", "value"),
@@ -296,7 +305,9 @@ def update_correlation_dropdowns(n, x_value, y_value):
         Input("time-range-slider", "value"),
     ]
 )
-def update_correlation_plot(n_intervals, x_col, y_col, resample_freq, time_range_slider):
+def update_correlation_plot(toggle, n_intervals, x_col, y_col, resample_freq, time_range_slider):
+    # theme template
+    template = light_theme if toggle else dark_theme
     if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns and x_col and y_col:
         datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
         slider_min = datetime_utcs.min().timestamp()
@@ -310,7 +321,7 @@ def update_correlation_plot(n_intervals, x_col, y_col, resample_freq, time_range
         else:
             data = data_manager.get_data(start_time, end_time, resample_freq)
         from plots import create_correlation_plot
-        fig = create_correlation_plot(data, x_col, y_col)
+        fig = create_correlation_plot(data, x_col, y_col, template=template)
         if fig:
             fig.update_layout(uirevision="correlation-constant", transition={'duration': 100})
         return fig
@@ -415,6 +426,7 @@ def update_time_slider(n, current_value):
         Output("total-rows-filtered", "children"),
     ],
     [
+        Input(ThemeSwitchAIO.ids.switch("theme"), "value"),
         Input("interval-component", "n_intervals"),
         Input("timeseries-fields-dropdown", "value"),
         Input("map-field-dropdown", "value"),
@@ -427,6 +439,7 @@ def update_time_slider(n, current_value):
     ],
 )
 def update_plots(
+    toggle,
     n_intervals,
     ts_fields,
     map_field,
@@ -435,6 +448,9 @@ def update_plots(
     last_update,
     stored_time_range,
 ):
+    # theme template
+    template = light_theme if toggle else dark_theme
+
     if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns:
         datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
         slider_min = datetime_utcs.min().timestamp()
@@ -461,13 +477,13 @@ def update_plots(
     total_rows_filtered = len(data)
 
     # Create plots with uirevision set from the beginning
-    ts_fig = create_timeseries_plot(data, ts_fields or [])
-    map_fig = create_map_plot(data, map_field)
+    ts_fig = create_timeseries_plot(data, ts_fields or [], template=template)
+    map_fig = create_map_plot(data, map_field, template=template)
 
     # Exclude datetime_utc and index columns
     exclude = ["datetime_utc", "index", "id"]
     fields = [col for col in data.columns if col not in exclude]
-    all_ts_fig = create_timeseries_plot(data, fields)
+    all_ts_fig = create_timeseries_plot(data, fields, template=template)
 
     # Set uirevision immediately during creation to minimize jumps
     if ts_fig:
@@ -483,7 +499,7 @@ def update_plots(
         )
 
     # Create a custom timeseries plot for the Dispersal View
-    dispersal_fig = create_dispersal_plot(data)
+    dispersal_fig = create_dispersal_plot(data, template=template)
 
     # Get the most recent timestamp from the data
     most_recent_timestamp = data_manager.data["datetime_utc"].max() if not data_manager.data.empty else None

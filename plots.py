@@ -1,7 +1,7 @@
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
-def create_timeseries_plot(data, fields, subplot_height=200):
+def create_timeseries_plot(data, fields, subplot_height=200, template="bootstrap"):
     """Create timeseries plot with subplots for multiple fields"""
     if data.empty or not fields:
         fig = go.Figure()
@@ -33,6 +33,7 @@ def create_timeseries_plot(data, fields, subplot_height=200):
             fig.update_yaxes(title_text=field, row=i + 1, col=1)
 
     fig.update_layout(
+        template=template,
         height=150 + subplot_height * len(fields),
         showlegend=False,
         #margin=dict(t=10, b=10, l=10, r=10)  # Adjust margins to reduce whitespace
@@ -55,10 +56,23 @@ def create_timeseries_plot(data, fields, subplot_height=200):
         )
     return fig
 
-def create_map_plot(df, field):
+def create_map_plot(df, field, template="bootstrap", style=None):
+    """
+    Create a map plot with optional style.
+    style: 'dark' (default) or 'bathymetry'.
+    """
     if df.empty:
         return go.Figure()
     track_data = df
+
+    if style is None:
+        if template == "darkly":
+            style = "dark"
+        else:
+            style = "light"
+
+    # if style not in ['white-bg', 'light', 'dark', 'carto-darkmatter', 'carto-positron']:
+    #     style = 'dark'  # Default to dark if unsupported style is provided
 
     # Calculate zoom and center BEFORE creating the map figure
     if not track_data.empty:
@@ -138,9 +152,12 @@ def create_map_plot(df, field):
                          f'Rho: {latest["rho_ppb"]:.1f} ppb<br>' +
                          f'Average pH: {latest["ph_corrected_ma"]:.2f}<extra></extra>'
         ))
+
+
     fig.update_layout(
+        template=template,
         map=dict(
-            style="dark",
+            style=style,
             center=dict(lat=center_lat, lon=center_lon),
             zoom=zoom
         ),
@@ -158,7 +175,7 @@ def create_map_plot(df, field):
     )
     return fig
 
-def create_dispersal_plot(data):
+def create_dispersal_plot(data, template="bootstrap"):
     dispersal_fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1)
 
     if "ph_corrected" in data.columns and "ph_corrected_ma" in data.columns:
@@ -197,7 +214,7 @@ def create_dispersal_plot(data):
         )
 
     dispersal_fig.update_layout(
-        #height=500,  # Fixed height to match the container
+        template=template,
         title="Dispersal View Timeseries",
         uirevision="dispersal-timeseries-constant",
         transition={'duration': 100},
@@ -237,11 +254,24 @@ def create_dispersal_plot(data):
 
     return dispersal_fig
 
-def create_correlation_plot(data, x_col, y_col):
-    import plotly.express as px
+def create_correlation_plot(data, x_col, y_col, template="bootstrap"):
     if data is None or data.empty or x_col not in data.columns or y_col not in data.columns:
-        return {}
-    fig = px.scatter(data, x=x_col, y=y_col, title=f"Correlation: {x_col} vs {y_col}", opacity=0.7)
-    fig.update_traces(marker=dict(size=8, line=dict(width=1, color='DarkSlateGrey')))
-    fig.update_layout(margin=dict(l=40, r=20, t=40, b=40))
+        return go.Figure()
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=data[x_col],
+            y=data[y_col],
+            mode="markers",
+            marker=dict(size=8, line=dict(width=1, color='DarkSlateGrey'), opacity=0.7),
+            name=f"{x_col} vs {y_col}"
+        )
+    )
+    fig.update_layout(
+        template=template,
+        title=f"Correlation: {x_col} vs {y_col}",
+        xaxis_title=x_col,
+        yaxis_title=y_col,
+        margin=dict(l=40, r=20, t=40, b=40)
+    )
     return fig
