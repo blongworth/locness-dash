@@ -4,23 +4,23 @@ import threading
 import time
 import pandas as pd
 
-
 import dash
 from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 
-import plotly.graph_objects as go
-
 from data import DataManager
 from plots import create_timeseries_plot, create_map_plot, create_dispersal_plot
 
-# TODO: Plot selection bug: selecting on plot filters data, can't zoom out
-# TODO: Fix "jump" on data update
-# TODO: Add data to traces rather than redrawing entire plot
-# TODO: Dispersal View
-# TODO: Diagnostics View
-# TODO: Property plot view
+
+# TODO: test automatic updates of all plots and data
+# TODO: local server
+# TODO: prevent "too much data"
+# TODO: test no network connection
 # TODO: calculate ph ma here and compare to ph_corrected_ma
+# TODO: dark mode
+# TODO: Diagnostics View
+# TODO: Add data to traces rather than redrawing entire plot
+
 
 # Load configuration from config.toml
 with open("config.toml", "rb") as f:
@@ -29,7 +29,6 @@ with open("config.toml", "rb") as f:
 # Use the top-level [locness_dash] section in config.toml
 config = toml_config.get("locness_dash", {})
 
-
 # Initialize data manager
 data_manager = DataManager(config["data_path"])
 data_manager.load_initial_data()
@@ -37,6 +36,7 @@ data_manager.load_initial_data()
 # Initialize Dash app
 external_stylesheets = [dbc.themes.BOOTSTRAP]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+server = app.server
 
 
 # Get available fields (excluding timestamp, datetime_utc and id columns)
