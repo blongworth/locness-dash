@@ -22,7 +22,11 @@ class DataManager:
                 if self.is_parquet:
                     self.data = pd.read_parquet(self.data_path, engine="pyarrow")
                     # Convert Unix timestamp to datetime if needed
+                    self.data = pd.read_parquet(self.data_path, engine="pyarrow")
+    # Convert timezone-aware datetime to naive UTC
                     if "datetime_utc" in self.data.columns:
+                        if pd.api.types.is_datetime64tz_dtype(self.data["datetime_utc"]):
+                            self.data["datetime_utc"] = self.data["datetime_utc"].dt.tz_convert("UTC").dt.tz_localize(None)
                         self.data["datetime_utc"] = pd.to_datetime(
                             self.data["datetime_utc"], unit="s"
                         )
@@ -57,6 +61,8 @@ class DataManager:
                 new_data = pd.read_parquet(self.data_path, engine="pyarrow")
                 # Convert Unix timestamp to datetime if needed
                 if "datetime_utc" in new_data.columns and new_data["datetime_utc"].dtype != 'datetime64[ns]':
+                    if pd.api.types.is_datetime64tz_dtype(self.data["datetime_utc"]):
+                        self.data["datetime_utc"] = self.data["datetime_utc"].dt.tz_convert("UTC").dt.tz_localize(None)
                     new_data["datetime_utc"] = pd.to_datetime(
                         new_data["datetime_utc"], unit="s"
                     )
