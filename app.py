@@ -35,7 +35,9 @@ data_manager.load_initial_data()
 
 # Initialize Dash app
 external_stylesheets = [dbc.themes.BOOTSTRAP]
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = dash.Dash(__name__, 
+                title="LOCNESS Underway Dashboard",
+                external_stylesheets=external_stylesheets)
 server = app.server
 
 
