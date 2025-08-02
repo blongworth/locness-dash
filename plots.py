@@ -245,3 +245,42 @@ def create_correlation_plot(data, x_col, y_col):
     fig.update_traces(marker=dict(size=8, line=dict(width=1, color='DarkSlateGrey')))
     fig.update_layout(margin=dict(l=40, r=20, t=40, b=40))
     return fig
+
+def create_bland_altman_plot(data, col1, col2):
+    """
+    Create a Bland-Altman plot comparing two columns in the DataFrame.
+    Plots the difference (col1 - col2) vs the mean of the two columns.
+    """
+    import plotly.graph_objects as go
+    import numpy as np
+    if data is None or data.empty or col1 not in data.columns or col2 not in data.columns:
+        return {}
+    x = data[[col1, col2]].dropna()
+    mean_vals = x[[col1, col2]].mean(axis=1)
+    diff_vals = x[col1] - x[col2]
+    mean_diff = diff_vals.mean()
+    std_diff = diff_vals.std()
+    upper = mean_diff + 1.96 * std_diff
+    lower = mean_diff - 1.96 * std_diff
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=mean_vals,
+        y=diff_vals,
+        mode='markers',
+        name='Difference',
+        marker=dict(size=8, color='blue', opacity=0.7)
+    ))
+    # Add mean line
+    fig.add_hline(y=mean_diff, line_dash='dash', line_color='green', annotation_text='Mean', annotation_position='top left')
+    # Add upper and lower lines
+    fig.add_hline(y=upper, line_dash='dot', line_color='red', annotation_text='+1.96 SD', annotation_position='top left')
+    fig.add_hline(y=lower, line_dash='dot', line_color='red', annotation_text='-1.96 SD', annotation_position='bottom left')
+
+    fig.update_layout(
+        title=f'Bland-Altman Plot: {col1} vs {col2}',
+        xaxis_title='Mean of Two Measurements',
+        yaxis_title=f'Difference ({col1} - {col2})',
+        margin=dict(l=40, r=20, t=40, b=40)
+    )
+    return fig

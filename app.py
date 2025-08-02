@@ -225,9 +225,6 @@ app.layout = html.Div([
             dcc.Tab(label="Correlation", value="Correlation", children=[
                 html.Div([
                     html.Div([
-                        dcc.Graph(id="correlation-scatterplot")
-                    ], style={"width": "100%", "padding": "10px"}),
-                    html.Div([
                         html.Div([
                             html.Label("X Axis:"),
                             dcc.Dropdown(
@@ -247,6 +244,12 @@ app.layout = html.Div([
                             ),
                         ], style={"flex": 1, "marginLeft": "10px"}),
                     ], style={"display": "flex", "flexDirection": "row", "width": "700px", "padding": "20px", "background": "#f8f9fa", "borderTop": "1px solid #ddd", "margin": "0 auto"}),
+                    html.Div([
+                        dcc.Graph(id="correlation-scatterplot")
+                    ], style={"width": "100%", "padding": "10px"}),
+                    html.Div([
+                        dcc.Graph(id="bland-altman-plot")
+                    ], style={"width": "100%", "padding": "10px"}),
                 ], style={"display": "flex", "flexDirection": "column", "alignItems": "center"}),
             ]),
 
@@ -287,9 +290,13 @@ def update_correlation_dropdowns(n, x_value, y_value):
     y_out = y_value if y_value in numeric_cols else (numeric_cols[1] if len(numeric_cols) > 1 else None)
     return options, x_out, options, y_out
 
-# Callback to update correlation scatterplot
+
+# Callback to update correlation scatterplot and Bland-Altman plot
 @app.callback(
-    Output("correlation-scatterplot", "figure"),
+    [
+        Output("correlation-scatterplot", "figure"),
+        Output("bland-altman-plot", "figure"),
+    ],
     [
         Input("interval-component", "n_intervals"),
         Input("correlation-x-dropdown", "value"),
@@ -298,8 +305,11 @@ def update_correlation_dropdowns(n, x_value, y_value):
         Input("time-range-slider", "value"),
     ]
 )
-def update_correlation_plot(n_intervals, x_col, y_col, resample_freq, time_range_slider):
-    if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns and x_col and y_col:
+def update_correlation_and_bland_altman(n_intervals, x_col, y_col, resample_freq, time_range_slider):
+    # Always return empty figures if x_col or y_col is None
+    if not x_col or not y_col:
+        return {}, {}
+    if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns:
         datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
         slider_min = datetime_utcs.min().timestamp()
         slider_max = datetime_utcs.max().timestamp()
@@ -311,12 +321,15 @@ def update_correlation_plot(n_intervals, x_col, y_col, resample_freq, time_range
             data = data_manager.get_data(start_time, end_time)
         else:
             data = data_manager.get_data(start_time, end_time, resample_freq)
-        from plots import create_correlation_plot
-        fig = create_correlation_plot(data, x_col, y_col)
-        if fig:
-            fig.update_layout(uirevision="correlation-constant", transition={'duration': 100})
-        return fig
-    return {}
+        from plots import create_correlation_plot, create_bland_altman_plot
+        fig_corr = create_correlation_plot(data, x_col, y_col)
+        if fig_corr:
+            fig_corr.update_layout(uirevision="correlation-constant", transition={'duration': 100})
+        fig_ba = create_bland_altman_plot(data, x_col, y_col)
+        if fig_ba:
+            fig_ba.update_layout(uirevision="bland-altman-constant", transition={'duration': 100})
+        return fig_corr, fig_ba
+    return {}, {}
 
 
 # Callback to update dropdown options and set default values
