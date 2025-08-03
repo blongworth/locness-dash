@@ -140,17 +140,6 @@ app.layout = html.Div([
     ], id="sidebar-container", style={"position": "fixed", "top": 60, "left": 0, "zIndex": 1000}),
     html.Div([
         dcc.Tabs([
-            dcc.Tab(label="Main View", value="Main View", children=[
-                html.Div([
-                    html.Div([dcc.Graph(id="map-plot")]),
-                    html.Div([dcc.Graph(id="timeseries-plot")]),
-                ], style={"padding": "10px"}),
-            ]),
-            dcc.Tab(label="All Fields Timeseries", value="All Fields Timeseries", children=[
-                html.Div([
-                    dcc.Graph(id="all-fields-timeseries-plot")
-                ], style={"padding": "10px"}),
-            ]),
             dcc.Tab(label="Dispersal View", value="Dispersal View", children=[
                 html.Div([
                     html.Div([
@@ -220,6 +209,17 @@ app.layout = html.Div([
                     html.Div([
                         dcc.Graph(id="map-plot-dispersal", style={"height": "100%", "minHeight": "200px", "width": "100%"})
                     ], style={"height": "50vh", "minHeight": "200px", "width": "100%"}),
+                ], style={"padding": "10px"}),
+            ]),
+            dcc.Tab(label="Main View", value="Main View", children=[
+                html.Div([
+                    html.Div([dcc.Graph(id="map-plot")]),
+                    html.Div([dcc.Graph(id="timeseries-plot")]),
+                ], style={"padding": "10px"}),
+            ]),
+            dcc.Tab(label="All Fields Timeseries", value="All Fields Timeseries", children=[
+                html.Div([
+                    dcc.Graph(id="all-fields-timeseries-plot")
                 ], style={"padding": "10px"}),
             ]),
             dcc.Tab(label="Correlation", value="Correlation", children=[
