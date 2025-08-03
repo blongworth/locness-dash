@@ -1,5 +1,7 @@
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+import plotly.express as px
+import numpy as np
 
 def create_timeseries_plot(data, fields, subplot_height=200):
     """Create timeseries plot with subplots for multiple fields"""
@@ -238,7 +240,6 @@ def create_dispersal_plot(data):
     return dispersal_fig
 
 def create_correlation_plot(data, x_col, y_col):
-    import plotly.express as px
     if data is None or data.empty or x_col not in data.columns or y_col not in data.columns:
         return {}
     fig = px.scatter(data, x=x_col, y=y_col, title=f"Correlation: {x_col} vs {y_col}", opacity=0.7)
@@ -251,8 +252,6 @@ def create_bland_altman_plot(data, col1, col2):
     Create a Bland-Altman plot comparing two columns in the DataFrame.
     Plots the difference (col1 - col2) vs the mean of the two columns.
     """
-    import plotly.graph_objects as go
-    import numpy as np
     if data is None or data.empty or col1 not in data.columns or col2 not in data.columns:
         return {}
     x = data[[col1, col2]].dropna()
