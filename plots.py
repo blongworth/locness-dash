@@ -264,7 +264,7 @@ def create_bland_altman_plot(data, col1, col2):
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=mean_vals,
+        x=x[col1],
         y=diff_vals,
         mode='markers',
         name='Difference',
@@ -277,8 +277,8 @@ def create_bland_altman_plot(data, col1, col2):
     fig.add_hline(y=lower, line_dash='dot', line_color='red', annotation_text='-1.96 SD', annotation_position='bottom left')
 
     fig.update_layout(
-        title=f'Bland-Altman Plot: {col1} vs {col2}',
-        xaxis_title='Mean of Two Measurements',
+        title=f'Difference Plot: {col1} vs {col2}',
+        xaxis_title=f'{col1}',
         yaxis_title=f'Difference ({col1} - {col2})',
         margin=dict(l=40, r=20, t=40, b=40)
     )
