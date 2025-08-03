@@ -9,7 +9,7 @@ from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 
 from data import DataManager
-from plots import create_timeseries_plot, create_map_plot, create_dispersal_plot
+from plots import create_timeseries_plot, create_map_plot, create_dispersal_plot, create_correlation_plot, create_bland_altman_plot
 
 
 # TODO: test automatic updates of all plots and data
@@ -286,8 +286,8 @@ def update_correlation_dropdowns(n, x_value, y_value):
     numeric_cols = [col for col in data_manager.data.columns if col not in exclude and data_manager.data[col].dtype in ["float64", "int64"]]
     options = [{"label": col, "value": col} for col in numeric_cols]
     # Set defaults if current value is not valid
-    x_out = x_value if x_value in numeric_cols else (numeric_cols[0] if numeric_cols else None)
-    y_out = y_value if y_value in numeric_cols else (numeric_cols[1] if len(numeric_cols) > 1 else None)
+    x_out = x_value if x_value in numeric_cols else (numeric_cols[8] if numeric_cols else None)
+    y_out = y_value if y_value in numeric_cols else (numeric_cols[10] if len(numeric_cols) > 9 else None)
     return options, x_out, options, y_out
 
 
@@ -321,7 +321,6 @@ def update_correlation_and_bland_altman(n_intervals, x_col, y_col, resample_freq
             data = data_manager.get_data(start_time, end_time)
         else:
             data = data_manager.get_data(start_time, end_time, resample_freq)
-        from plots import create_correlation_plot, create_bland_altman_plot
         fig_corr = create_correlation_plot(data, x_col, y_col)
         if fig_corr:
             fig_corr.update_layout(uirevision="correlation-constant", transition={'duration': 100})
