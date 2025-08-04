@@ -51,7 +51,7 @@ dbc_css = (
 app = dash.Dash(
     __name__,
     title="LOCNESS Underway Dashboard",
-    external_stylesheets=[url_light_theme, dbc_css],
+    external_stylesheets=[url_light_theme, url_dark_theme, dbc_css],
 )
 server = app.server
 
@@ -86,7 +86,7 @@ def get_map_fields():
 
 app.layout = html.Div(
     [
-        html.H1("LOCNESS Underway Dashboard", style={"textAlign": "center"}),
+        html.H1("LOCNESS Underway Dashboard", id="main-title", style={"textAlign": "center"}),
         html.Div(
             [
                 html.Div(
@@ -98,7 +98,7 @@ app.layout = html.Div(
                                 url_dark_theme,
                             ],
                         ),
-                        html.Label("Timeseries Fields:"),
+                        html.Label("Timeseries Fields:", id="timeseries-label"),
                         dcc.Dropdown(
                             id="timeseries-fields-dropdown",
                             options=[],
@@ -107,7 +107,7 @@ app.layout = html.Div(
                             placeholder="Select marine data fields for timeseries",
                         ),
                         html.Br(),
-                        html.Label("Map Field:"),
+                        html.Label("Map Field:", id="map-label"),
                         dcc.Dropdown(
                             id="map-field-dropdown",
                             options=[],
@@ -115,7 +115,7 @@ app.layout = html.Div(
                             placeholder="Select field for ship track visualization",
                         ),
                         html.Br(),
-                        html.Label("Resample Interval:"),
+                        html.Label("Resample Interval:", id="resample-label"),
                         dcc.Dropdown(
                             id="resample-dropdown",
                             options=[
@@ -129,7 +129,7 @@ app.layout = html.Div(
                             clearable=False,
                         ),
                         html.Br(),
-                        html.Label("Time Range:"),
+                        html.Label("Time Range:", id="time-range-label"),
                         dcc.RangeSlider(
                             id="time-range-slider",
                             min=0,
@@ -143,17 +143,19 @@ app.layout = html.Div(
                         html.Br(),
                         html.Div(
                             [
-                                html.Label("Last update:"),
+                                html.Label("Last update:", id="last-update-label"),
                                 html.P(id="last-update-display"),
-                                html.Label("Last timestamp:"),
+                                html.Label("Last timestamp:", id="last-timestamp-label"),
                                 html.P(id="most-recent-timestamp-display"),
-                                html.Label("Total rows (all data):"),
+                                html.Label("Total rows (all data):", id="total-rows-all-label"),
                                 html.P(id="total-rows-all-data"),
-                                html.Label("Total rows (filtered):"),
+                                html.Label("Total rows (filtered):", id="total-rows-filtered-label"),
                                 html.P(id="total-rows-filtered"),
-                            ]
+                            ],
+                            id="status-info"
                         ),
                     ],
+                    id="sidebar",
                     style={
                         "width": "250px",
                         "padding": "20px",
@@ -169,7 +171,9 @@ app.layout = html.Div(
         html.Div(
             [
                 dcc.Tabs(
-                    [
+                    id="main-tabs",
+                    value="Dispersal View",
+                    children=[
                         dcc.Tab(
                             label="Dispersal View",
                             value="Dispersal View",
@@ -334,7 +338,7 @@ app.layout = html.Div(
                                             [
                                                 html.Div(
                                                     [
-                                                        html.Label("X Axis:"),
+                                                        html.Label("X Axis:", id="corr-x-label"),
                                                         dcc.Dropdown(
                                                             id="correlation-x-dropdown",
                                                             options=[],
@@ -349,7 +353,7 @@ app.layout = html.Div(
                                                 ),
                                                 html.Div(
                                                     [
-                                                        html.Label("Y Axis:"),
+                                                        html.Label("Y Axis:", id="corr-y-label"),
                                                         dcc.Dropdown(
                                                             id="correlation-y-dropdown",
                                                             options=[],
@@ -363,6 +367,7 @@ app.layout = html.Div(
                                                     },
                                                 ),
                                             ],
+                                            id="correlation-controls",
                                             style={
                                                 "display": "flex",
                                                 "flexDirection": "row",
@@ -391,8 +396,6 @@ app.layout = html.Div(
                             ],
                         ),
                     ],
-                    id="main-tabs",
-                    value="Dispersal View",
                 ),
                 dcc.Store(id="last-update-time"),
                 dcc.Store(id="time-range-store"),
@@ -402,14 +405,167 @@ app.layout = html.Div(
                     n_intervals=0,
                 ),
             ],
+            id="main-content",
             style={
                 "marginLeft": "270px",
                 "padding": "0px 10px 10px 10px",
                 "minWidth": 0,
             },
         ),
-    ]
+    ],
+    id="app-container"
 )
+
+
+# Function to get theme-based styles
+def get_theme_styles(is_light_theme):
+    """Get styles for different components based on theme"""
+    if is_light_theme:
+        return {
+            "app_container": {
+                "backgroundColor": "#ffffff",
+                "color": "#000000"
+            },
+            "sidebar": {
+                "width": "250px",
+                "padding": "20px",
+                "background": "#f8f9fa",
+                "borderRight": "1px solid #dee2e6",
+                "height": "100%",
+                "color": "#000000"
+            },
+            "value_box": {
+                "height": "120px",
+                "width": "150px",
+                "display": "flex",
+                "flexDirection": "column",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "textAlign": "center",
+                "padding": "10px",
+                "border": "1px solid #dee2e6",
+                "background": "#ffffff",
+                "marginBottom": "20px",
+                "color": "#000000"
+            },
+            "main_title": {
+                "textAlign": "center",
+                "color": "#000000"
+            },
+            "label": {
+                "color": "#000000"
+            }
+        }
+    else:
+        return {
+            "app_container": {
+                "backgroundColor": "#222222",
+                "color": "#ffffff"
+            },
+            "sidebar": {
+                "width": "250px",
+                "padding": "20px",
+                "background": "#2c3e50",
+                "borderRight": "1px solid #495057",
+                "height": "100%",
+                "color": "#ffffff"
+            },
+            "value_box": {
+                "height": "120px",
+                "width": "150px",
+                "display": "flex",
+                "flexDirection": "column",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "textAlign": "center",
+                "padding": "10px",
+                "border": "1px solid #495057",
+                "background": "#34495e",
+                "marginBottom": "20px",
+                "color": "#ffffff"
+            },
+            "main_title": {
+                "textAlign": "center",
+                "color": "#ffffff"
+            },
+            "label": {
+                "color": "#ffffff"
+            }
+        }
+
+
+# Callback to update theme styles
+@app.callback(
+    [
+        Output("app-container", "style"),
+        Output("sidebar", "style"),
+        Output("ph-value-box", "style"),
+        Output("rho-value-box", "style"),
+        Output("main-title", "style"),
+        Output("timeseries-label", "style"),
+        Output("map-label", "style"),
+        Output("resample-label", "style"),
+        Output("time-range-label", "style"),
+        Output("last-update-label", "style"),
+        Output("last-timestamp-label", "style"),
+        Output("total-rows-all-label", "style"),
+        Output("total-rows-filtered-label", "style"),
+        Output("main-content", "style"),
+        Output("correlation-controls", "style"),
+        Output("corr-x-label", "style"),
+        Output("corr-y-label", "style"),
+    ],
+    [Input(ThemeSwitchAIO.ids.switch("theme"), "value")]
+)
+def update_theme_styles(toggle):
+    """Update component styles based on theme selection"""
+    is_light_theme = toggle
+    styles = get_theme_styles(is_light_theme)
+    
+    # Base rho value box style (without marginBottom for the second box)
+    rho_box_style = styles["value_box"].copy()
+    rho_box_style.pop("marginBottom", None)
+    
+    # Main content style
+    main_content_style = {
+        "marginLeft": "270px",
+        "padding": "0px 10px 10px 10px",
+        "minWidth": 0,
+        "backgroundColor": styles["app_container"]["backgroundColor"],
+        "color": styles["app_container"]["color"]
+    }
+    
+    # Correlation controls style
+    correlation_controls_style = {
+        "display": "flex",
+        "flexDirection": "row",
+        "width": "700px",
+        "padding": "20px",
+        "background": styles["sidebar"]["background"],
+        "borderTop": f"1px solid {styles['sidebar']['borderRight'].split(' ')[-1]}",
+        "margin": "0 auto",
+        "color": styles["app_container"]["color"]
+    }
+    
+    return (
+        styles["app_container"],        # app-container
+        styles["sidebar"],              # sidebar
+        styles["value_box"],            # ph-value-box
+        rho_box_style,                 # rho-value-box
+        styles["main_title"],           # main-title
+        styles["label"],                # timeseries-label
+        styles["label"],                # map-label
+        styles["label"],                # resample-label
+        styles["label"],                # time-range-label
+        styles["label"],                # last-update-label
+        styles["label"],                # last-timestamp-label
+        styles["label"],                # total-rows-all-label
+        styles["label"],                # total-rows-filtered-label
+        main_content_style,             # main-content
+        correlation_controls_style,     # correlation-controls
+        styles["label"],                # corr-x-label
+        styles["label"],                # corr-y-label
+    )
 
 
 # Callback to update correlation dropdown options
@@ -718,25 +874,33 @@ def update_plots(
     Output("ph-value", "style"),
     Output("rho-value", "children"),
     Output("rho-value", "style"),
-    Input("interval-component", "n_intervals"),
+    [
+        Input("interval-component", "n_intervals"),
+        Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+    ]
 )
-def update_value_boxes(n_intervals):
+def update_value_boxes(n_intervals, toggle):
+    is_light_theme = toggle
+    default_color = "black" if is_light_theme else "lightgrey"
+    
     ph_val = "No Data"
-    ph_style = {"fontSize": "46px", "color": "black", "fontWeight": "bold"}
+    ph_style = {"fontSize": "46px", "color": default_color, "fontWeight": "bold"}
     rho_val = "No Data"
-    rho_style = {"fontSize": "46px", "color": "black", "fontWeight": "bold"}
+    rho_style = {"fontSize": "46px", "color": default_color, "fontWeight": "bold"}
+    
     if not data_manager.data.empty:
         if "ph_corrected_ma" in data_manager.data.columns:
             latest_ph = data_manager.data["ph_corrected_ma"].iloc[-1]
             ph_val = f"{latest_ph:.2f}"
             ph_style = {
                 "fontSize": "46px",
-                "color": "red" if latest_ph > 8 else "black",
+                "color": "red" if latest_ph > 8 else default_color,
                 "fontWeight": "bold",
             }
         if "rho_ppb" in data_manager.data.columns:
             latest_rho = data_manager.data["rho_ppb"].iloc[-1]
             rho_val = f"{latest_rho:.1f}"
+            rho_style = {"fontSize": "46px", "color": default_color, "fontWeight": "bold"}
     return ph_val, ph_style, rho_val, rho_style
 
 
