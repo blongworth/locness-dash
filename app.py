@@ -162,7 +162,7 @@ app.layout = html.Div([
                             dbc.Col([
                                 dcc.Graph(id="timeseries-plot-dispersal", 
                                          style={"height": "30vh", "minHeight": "200px"})
-                            ], width=8),
+                            ], width=10),
                             dbc.Col([
                                 dbc.Card([
                                     dbc.CardBody([
@@ -178,7 +178,7 @@ app.layout = html.Div([
                                                className="text-center", style={"fontSize": "2.5rem"})
                                     ])
                                 ], color="light", outline=True)
-                            ], width=4)
+                            ], width=2)
                         ], className="mb-3"),
                         dbc.Row([
                             dbc.Col([

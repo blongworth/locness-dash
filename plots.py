@@ -122,7 +122,6 @@ def create_map_plot(df, field, template="bootstrap", style=None):
         q_values = [color_vals.quantile(q) for q in quantiles]
 
         # Use log scale for highly skewed data if the range is large and all values are positive
-        data_range = color_vals.max() - color_vals.min()
         is_log_suitable = (
             color_vals.min() > 0 and (color_vals.max() / color_vals.min()) > 10
         )
