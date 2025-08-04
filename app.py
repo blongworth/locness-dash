@@ -84,149 +84,151 @@ def get_map_fields():
     return []
 
 
-app.layout = dbc.Container([
-    dbc.Row([
-        dbc.Col([
-            html.H1("LOCNESS Underway Dashboard", className="text-center mb-4"),
-        ], width=12)
-    ]),
-    dbc.Row([
-        # Sidebar
-        dbc.Col([
-            dbc.Card([
-                dbc.CardBody([
-                    ThemeSwitchAIO(
-                        aio_id="theme",
-                        themes=[url_light_theme, url_dark_theme],
-                    ),
-                    html.Hr(),
-                    dbc.Label("Timeseries Fields:"),
-                    dcc.Dropdown(
-                        id="timeseries-fields-dropdown",
-                        options=[],
-                        value=["rho_ppb", "ph_corrected_ma"],
-                        multi=True,
-                        placeholder="Select marine data fields for timeseries",
-                        className="mb-3"
-                    ),
-                    dbc.Label("Map Field:"),
-                    dcc.Dropdown(
-                        id="map-field-dropdown",
-                        options=[],
-                        value="rho_ppb",
-                        placeholder="Select field for ship track visualization",
-                        className="mb-3"
-                    ),
-                    dbc.Label("Resample Interval:"),
-                    dcc.Dropdown(
-                        id="resample-dropdown",
-                        options=[
-                            {"label": "10 Seconds", "value": "10s"},
-                            {"label": "1 Minute", "value": "1min"},
-                            {"label": "10 Minutes", "value": "10min"},
-                            {"label": "1 Hour", "value": "1h"},
-                        ],
-                        value=config["default_resampling"],
-                        clearable=False,
-                        className="mb-3"
-                    ),
-                    dbc.Label("Time Range:"),
-                    dcc.RangeSlider(
-                        id="time-range-slider",
-                        min=0, max=1, step=1, value=[0, 1],
-                        marks={}, tooltip={"placement": "bottom", "always_visible": False},
-                        allowCross=False, className="mb-3"
-                    ),
-                    html.Hr(),
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.P([dbc.Badge("Last update:", color="secondary", className="me-2"), 
-                                   html.Span(id="last-update-display")]),
-                            html.P([dbc.Badge("Last timestamp:", color="secondary", className="me-2"), 
-                                   html.Span(id="most-recent-timestamp-display")]),
-                            html.P([dbc.Badge("Total rows (all):", color="info", className="me-2"), 
-                                   html.Span(id="total-rows-all-data")]),
-                            html.P([dbc.Badge("Total rows (filtered):", color="info", className="me-2"), 
-                                   html.Span(id="total-rows-filtered")]),
-                        ])
-                    ], color="light", outline=True)
-                ])
-            ])
-        ], width=3),
-        # Main content
-        dbc.Col([
-            dbc.Tabs([
-                dbc.Tab(label="Dispersal View", tab_id="dispersal", children=[
-                    dbc.Row([
-                        dbc.Col([
-                            dcc.Graph(id="timeseries-plot-dispersal", 
-                                     style={"height": "30vh", "minHeight": "200px"})
-                        ], width=8),
-                        dbc.Col([
-                            dbc.Card([
-                                dbc.CardBody([
-                                    html.H6("pH (2min avg)", className="text-center"),
-                                    html.H2(id="ph-value", children="No Data", 
-                                           className="text-center", style={"fontSize": "2.5rem"})
-                                ])
-                            ], className="mb-2", color="light", outline=True),
-                            dbc.Card([
-                                dbc.CardBody([
-                                    html.H6("Rho (ppb)", className="text-center"),
-                                    html.H2(id="rho-value", children="No Data", 
-                                           className="text-center", style={"fontSize": "2.5rem"})
-                                ])
-                            ], color="light", outline=True)
-                        ], width=4)
-                    ], className="mb-3"),
-                    dbc.Row([
-                        dbc.Col([
-                            dcc.Graph(id="map-plot-dispersal", 
-                                     style={"height": "50vh", "minHeight": "300px"})
-                        ], width=12)
+app.layout = html.Div([
+    dbc.Container([
+        dbc.Row([
+            dbc.Col([
+                html.H1("LOCNESS Underway Dashboard", className="text-center mb-4"),
+            ], width=12)
+        ]),
+        dbc.Row([
+            # Sidebar
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        ThemeSwitchAIO(
+                            aio_id="theme",
+                            themes=[url_light_theme, url_dark_theme],
+                        ),
+                        html.Hr(),
+                        dbc.Label("Timeseries Fields:"),
+                        dcc.Dropdown(
+                            id="timeseries-fields-dropdown",
+                            options=[],
+                            value=["rho_ppb", "ph_corrected_ma"],
+                            multi=True,
+                            placeholder="Select marine data fields for timeseries",
+                            className="mb-3"
+                        ),
+                        dbc.Label("Map Field:"),
+                        dcc.Dropdown(
+                            id="map-field-dropdown",
+                            options=[],
+                            value="rho_ppb",
+                            placeholder="Select field for ship track visualization",
+                            className="mb-3"
+                        ),
+                        dbc.Label("Resample Interval:"),
+                        dcc.Dropdown(
+                            id="resample-dropdown",
+                            options=[
+                                {"label": "10 Seconds", "value": "10s"},
+                                {"label": "1 Minute", "value": "1min"},
+                                {"label": "10 Minutes", "value": "10min"},
+                                {"label": "1 Hour", "value": "1h"},
+                            ],
+                            value=config["default_resampling"],
+                            clearable=False,
+                            className="mb-3"
+                        ),
+                        dbc.Label("Time Range:"),
+                        dcc.RangeSlider(
+                            id="time-range-slider",
+                            min=0, max=1, step=1, value=[0, 1],
+                            marks={}, tooltip={"placement": "bottom", "always_visible": False},
+                            allowCross=False, className="mb-3"
+                        ),
+                        html.Hr(),
+                        dbc.Card([
+                            dbc.CardBody([
+                                html.P([dbc.Badge("Last update:", color="secondary", className="me-2"), 
+                                       html.Span(id="last-update-display")]),
+                                html.P([dbc.Badge("Last timestamp:", color="secondary", className="me-2"), 
+                                       html.Span(id="most-recent-timestamp-display")]),
+                                html.P([dbc.Badge("Total rows (all):", color="info", className="me-2"), 
+                                       html.Span(id="total-rows-all-data")]),
+                                html.P([dbc.Badge("Total rows (filtered):", color="info", className="me-2"), 
+                                       html.Span(id="total-rows-filtered")]),
+                            ])
+                        ], color="light", outline=True)
                     ])
-                ]),
-                dbc.Tab(label="Main View", tab_id="main", children=[
-                    dcc.Graph(id="map-plot", style={"height": "40vh", "minHeight": "300px"}),
-                    dcc.Graph(id="timeseries-plot", style={"height": "40vh", "minHeight": "300px"})
-                ]),
-                dbc.Tab(label="All Fields Timeseries", tab_id="all-fields", children=[
-                    dcc.Graph(id="all-fields-timeseries-plot", 
-                             style={"height": "80vh", "minHeight": "600px"})
-                ]),
-                dbc.Tab(label="Correlation", tab_id="correlation", children=[
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Card([
-                                dbc.CardBody([
-                                    dbc.Row([
-                                        dbc.Col([
-                                            dbc.Label("X Axis:"),
-                                            dcc.Dropdown(id="correlation-x-dropdown", options=[], 
-                                                       placeholder="Select X variable")
-                                        ], width=6),
-                                        dbc.Col([
-                                            dbc.Label("Y Axis:"),
-                                            dcc.Dropdown(id="correlation-y-dropdown", options=[], 
-                                                       placeholder="Select Y variable")
-                                        ], width=6)
-                                    ])
-                                ])
-                            ], className="mb-3")
-                        ], width=12)
-                    ]),
-                    dcc.Graph(id="correlation-scatterplot", 
-                             style={"height": "40vh", "minHeight": "300px"}),
-                    dcc.Graph(id="bland-altman-plot", 
-                             style={"height": "40vh", "minHeight": "300px"})
                 ])
-            ], id="main-tabs", active_tab="dispersal")
-        ], width=9)
-    ]),
-    dcc.Store(id="last-update-time"),
-    dcc.Store(id="time-range-store"),
-    dcc.Interval(id="interval-component", interval=config["update_interval"] * 1000, n_intervals=0),
-], fluid=True, id="app-container")
+            ], width=3),
+            # Main content
+            dbc.Col([
+                dbc.Tabs([
+                    dbc.Tab(label="Dispersal View", tab_id="dispersal", children=[
+                        dbc.Row([
+                            dbc.Col([
+                                dcc.Graph(id="timeseries-plot-dispersal", 
+                                         style={"height": "30vh", "minHeight": "200px"})
+                            ], width=8),
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardBody([
+                                        html.H6("pH (2min avg)", className="text-center"),
+                                        html.H2(id="ph-value", children="No Data", 
+                                               className="text-center", style={"fontSize": "2.5rem"})
+                                    ])
+                                ], className="mb-2", color="light", outline=True),
+                                dbc.Card([
+                                    dbc.CardBody([
+                                        html.H6("Rho (ppb)", className="text-center"),
+                                        html.H2(id="rho-value", children="No Data", 
+                                               className="text-center", style={"fontSize": "2.5rem"})
+                                    ])
+                                ], color="light", outline=True)
+                            ], width=4)
+                        ], className="mb-3"),
+                        dbc.Row([
+                            dbc.Col([
+                                dcc.Graph(id="map-plot-dispersal", 
+                                         style={"height": "50vh", "minHeight": "300px"})
+                            ], width=12)
+                        ])
+                    ]),
+                    dbc.Tab(label="Main View", tab_id="main", children=[
+                        dcc.Graph(id="map-plot", style={"height": "40vh", "minHeight": "300px"}),
+                        dcc.Graph(id="timeseries-plot", style={"height": "40vh", "minHeight": "300px"})
+                    ]),
+                    dbc.Tab(label="All Fields Timeseries", tab_id="all-fields", children=[
+                        dcc.Graph(id="all-fields-timeseries-plot", 
+                                 style={"height": "80vh", "minHeight": "600px"})
+                    ]),
+                    dbc.Tab(label="Correlation", tab_id="correlation", children=[
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardBody([
+                                        dbc.Row([
+                                            dbc.Col([
+                                                dbc.Label("X Axis:"),
+                                                dcc.Dropdown(id="correlation-x-dropdown", options=[], 
+                                                           placeholder="Select X variable")
+                                            ], width=6),
+                                            dbc.Col([
+                                                dbc.Label("Y Axis:"),
+                                                dcc.Dropdown(id="correlation-y-dropdown", options=[], 
+                                                           placeholder="Select Y variable")
+                                            ], width=6)
+                                        ])
+                                    ])
+                                ], className="mb-3")
+                            ], width=12)
+                        ]),
+                        dcc.Graph(id="correlation-scatterplot", 
+                                 style={"height": "40vh", "minHeight": "300px"}),
+                        dcc.Graph(id="bland-altman-plot", 
+                                 style={"height": "40vh", "minHeight": "300px"})
+                    ])
+                ], id="main-tabs", active_tab="dispersal")
+            ], width=9)
+        ]),
+        dcc.Store(id="last-update-time"),
+        dcc.Store(id="time-range-store"),
+        dcc.Interval(id="interval-component", interval=config["update_interval"] * 1000, n_intervals=0),
+    ], fluid=True)
+], id="app-container")
 
 
 # Simple theme function using Bootstrap classes
