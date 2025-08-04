@@ -55,6 +55,127 @@ app = dash.Dash(
 )
 server = app.server
 
+# Add custom CSS for theme transitions and tab styling
+app.index_string = '''
+<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        {%favicon%}
+        {%css%}
+        <style>
+            body {
+                transition: background-color 0.3s ease, color 0.3s ease;
+                margin: 0;
+                padding: 0;
+            }
+            .dash-dropdown {
+                transition: background-color 0.3s ease, color 0.3s ease;
+            }
+            .Select-control {
+                transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+            }
+            /* Tab styling */
+            .tab-content {
+                transition: background-color 0.3s ease, color 0.3s ease;
+            }
+            /* Dash tab classes */
+            .tab {
+                transition: all 0.3s ease !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                min-height: 40px !important;
+                padding: 8px 16px !important;
+            }
+            .tab--selected {
+                transition: all 0.3s ease !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                min-height: 40px !important;
+                padding: 8px 16px !important;
+            }
+            /* Tab text centering */
+            .tab > div {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                height: 100% !important;
+            }
+            /* Light theme tab styles */
+            .light-theme .tab {
+                background-color: #f8f9fa !important;
+                border: 1px solid #dee2e6 !important;
+                border-bottom: none !important;
+                color: #000000 !important;
+                font-weight: normal !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            .light-theme .tab--selected {
+                background-color: #ffffff !important;
+                border: 1px solid #dee2e6 !important;
+                border-bottom: 1px solid #ffffff !important;
+                color: #000000 !important;
+                font-weight: bold !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            .light-theme .tabs {
+                background-color: #ffffff !important;
+                border-bottom: 1px solid #dee2e6 !important;
+            }
+            /* Dark theme tab styles */
+            .dark-theme .tab {
+                background-color: #2c3e50 !important;
+                border: 1px solid #495057 !important;
+                border-bottom: none !important;
+                color: #ffffff !important;
+                font-weight: normal !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            .dark-theme .tab--selected {
+                background-color: #34495e !important;
+                border: 1px solid #495057 !important;
+                border-bottom: 1px solid #222222 !important;
+                color: #ffffff !important;
+                font-weight: bold !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            .dark-theme .tabs {
+                background-color: #222222 !important;
+                border-bottom: 1px solid #495057 !important;
+            }
+            /* Ensure tabs container proper alignment */
+            .tabs {
+                display: flex !important;
+                align-items: stretch !important;
+            }
+            .tabs > div {
+                display: flex !important;
+                align-items: stretch !important;
+            }
+        </style>
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>
+'''
+
 
 # Get available fields (excluding timestamp, datetime_utc and id columns)
 def get_available_fields():
@@ -173,6 +294,7 @@ app.layout = html.Div(
                 dcc.Tabs(
                     id="main-tabs",
                     value="Dispersal View",
+                    style={"height": "50px"},
                     children=[
                         dcc.Tab(
                             label="Dispersal View",
@@ -454,6 +576,25 @@ def get_theme_styles(is_light_theme):
             },
             "label": {
                 "color": "#000000"
+            },
+            "tabs": {
+                "height": "50px",
+                "backgroundColor": "#ffffff",
+                "borderBottom": "1px solid #dee2e6"
+            },
+            "tab": {
+                "backgroundColor": "#f8f9fa",
+                "border": "1px solid #dee2e6",
+                "borderBottom": "none",
+                "color": "#000000",
+                "fontWeight": "normal"
+            },
+            "tab_selected": {
+                "backgroundColor": "#ffffff",
+                "border": "1px solid #dee2e6",
+                "borderBottom": "1px solid #ffffff",
+                "color": "#000000",
+                "fontWeight": "bold"
             }
         }
     else:
@@ -490,6 +631,25 @@ def get_theme_styles(is_light_theme):
             },
             "label": {
                 "color": "#ffffff"
+            },
+            "tabs": {
+                "height": "50px",
+                "backgroundColor": "#222222",
+                "borderBottom": "1px solid #495057"
+            },
+            "tab": {
+                "backgroundColor": "#2c3e50",
+                "border": "1px solid #495057",
+                "borderBottom": "none",
+                "color": "#ffffff",
+                "fontWeight": "normal"
+            },
+            "tab_selected": {
+                "backgroundColor": "#34495e",
+                "border": "1px solid #495057",
+                "borderBottom": "1px solid #222222",
+                "color": "#ffffff",
+                "fontWeight": "bold"
             }
         }
 
@@ -514,6 +674,8 @@ def get_theme_styles(is_light_theme):
         Output("correlation-controls", "style"),
         Output("corr-x-label", "style"),
         Output("corr-y-label", "style"),
+        Output("main-tabs", "style"),
+        Output("app-container", "className"),
     ],
     [Input(ThemeSwitchAIO.ids.switch("theme"), "value")]
 )
@@ -565,6 +727,8 @@ def update_theme_styles(toggle):
         correlation_controls_style,     # correlation-controls
         styles["label"],                # corr-x-label
         styles["label"],                # corr-y-label
+        styles["tabs"],                 # main-tabs
+        "light-theme" if is_light_theme else "dark-theme",  # app-container className
     )
 
 
