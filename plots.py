@@ -68,6 +68,88 @@ def create_timeseries_plot(data, fields, subplot_height=200, template="bootstrap
     return fig
 
 
+def create_dispersal_plot(data, template="bootstrap"):
+    dispersal_fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1
+    )
+
+    if "ph_corrected" in data.columns and "ph_corrected_ma" in data.columns:
+        dispersal_fig.add_trace(
+            go.Scatter(
+                x=data["datetime_utc"],
+                y=data["ph_corrected"],
+                mode="lines",
+                name="pH",
+                line=dict(color="lightblue"),
+            ),
+            row=1,
+            col=1,
+        )
+        dispersal_fig.add_trace(
+            go.Scatter(
+                x=data["datetime_utc"],
+                y=data["ph_corrected_ma"],
+                mode="lines",
+                name="pH (2 min avg)",
+                line=dict(color="blue"),
+            ),
+            row=1,
+            col=1,
+        )
+
+    if "rho_ppb" in data.columns:
+        dispersal_fig.add_trace(
+            go.Scatter(
+                x=data["datetime_utc"],
+                y=data["rho_ppb"],
+                mode="lines",
+                name="Rho (ppb)",
+                line=dict(color="red"),
+                showlegend=False,  # Hide legend for rho_ppb
+            ),
+            row=2,
+            col=1,
+        )
+
+    dispersal_fig.update_layout(
+        template=template,
+        title="Dispersal View Timeseries",
+        uirevision="dispersal-timeseries-constant",
+        transition={"duration": 100},
+        yaxis1_title="pH",  # Label for pH subplot
+        yaxis2_title="Rho [ppb]",  # Label for Rho subplot
+        legend=dict(
+            x=1,  # Move legend back to right edge
+            y=1,
+            xanchor="right",
+            yanchor="top",
+            bgcolor="rgba(0,0,0,0)",  # Make the background transparent
+        ),
+        margin=dict(t=50, b=50, l=50, r=50),  # Standard margins
+    )
+
+    # Update x-axes to add padding and prevent edge collision
+    #dispersal_fig.update_xaxes(
+    #    row=1, col=1, rangeslider=dict(visible=False), type="date", automargin=True
+    #)
+    #dispersal_fig.update_xaxes(
+    #    row=2, col=1, rangeslider=dict(visible=False), type="date", automargin=True
+    #)
+
+    # Add some padding to prevent data from touching the edges
+    #if not data.empty and "datetime_utc" in data.columns:
+    #    time_range = data["datetime_utc"].max() - data["datetime_utc"].min()
+    #    padding = time_range * 0.02  # 2% padding on each side
+    #    dispersal_fig.update_xaxes(
+    #        range=[
+    #            data["datetime_utc"].min() - padding,
+    #            data["datetime_utc"].max() + padding,
+    #        ]
+    #    )
+
+    return dispersal_fig
+
+
 def create_map_plot(df, field, template="bootstrap", style=None):
     """
     Create a map plot with optional style.
@@ -218,88 +300,6 @@ def create_map_plot(df, field, template="bootstrap", style=None):
         ),
     )
     return fig
-
-
-def create_dispersal_plot(data, template="bootstrap"):
-    dispersal_fig = make_subplots(
-        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1
-    )
-
-    if "ph_corrected" in data.columns and "ph_corrected_ma" in data.columns:
-        dispersal_fig.add_trace(
-            go.Scatter(
-                x=data["datetime_utc"],
-                y=data["ph_corrected"],
-                mode="lines",
-                name="pH",
-                line=dict(color="lightblue"),
-            ),
-            row=1,
-            col=1,
-        )
-        dispersal_fig.add_trace(
-            go.Scatter(
-                x=data["datetime_utc"],
-                y=data["ph_corrected_ma"],
-                mode="lines",
-                name="pH (2 min avg)",
-                line=dict(color="blue"),
-            ),
-            row=1,
-            col=1,
-        )
-
-    if "rho_ppb" in data.columns:
-        dispersal_fig.add_trace(
-            go.Scatter(
-                x=data["datetime_utc"],
-                y=data["rho_ppb"],
-                mode="lines",
-                name="Rho (ppb)",
-                line=dict(color="red"),
-                showlegend=False,  # Hide legend for rho_ppb
-            ),
-            row=2,
-            col=1,
-        )
-
-    dispersal_fig.update_layout(
-        template=template,
-        title="Dispersal View Timeseries",
-        uirevision="dispersal-timeseries-constant",
-        transition={"duration": 100},
-        yaxis1_title="pH",  # Label for pH subplot
-        yaxis2_title="Rho [ppb]",  # Label for Rho subplot
-        legend=dict(
-            x=1,  # Move legend back to right edge
-            y=1,
-            xanchor="right",
-            yanchor="top",
-            bgcolor="rgba(0,0,0,0)",  # Make the background transparent
-        ),
-        margin=dict(t=50, b=50, l=50, r=50),  # Standard margins
-    )
-
-    # Update x-axes to add padding and prevent edge collision
-    dispersal_fig.update_xaxes(
-        row=1, col=1, rangeslider=dict(visible=False), type="date", automargin=True
-    )
-    dispersal_fig.update_xaxes(
-        row=2, col=1, rangeslider=dict(visible=False), type="date", automargin=True
-    )
-
-    # Add some padding to prevent data from touching the edges
-    if not data.empty and "datetime_utc" in data.columns:
-        time_range = data["datetime_utc"].max() - data["datetime_utc"].min()
-        padding = time_range * 0.02  # 2% padding on each side
-        dispersal_fig.update_xaxes(
-            range=[
-                data["datetime_utc"].min() - padding,
-                data["datetime_utc"].max() + padding,
-            ]
-        )
-
-    return dispersal_fig
 
 
 def create_correlation_plot(data, x_col, y_col, template="bootstrap"):
