@@ -2,7 +2,8 @@
 # Path to the SQLite database file
 # Example: data_path = "underway_data.db"
 #data_path = "/Users/brett/Library/CloudStorage/GoogleDrive-blongworth@whoi.edu/Shared drives/locness/synthetic_data/locness.parquet"
-data_path = "../locness-datamanager/data/locness.db"
+data_path = "/Users/brett/Library/CloudStorage/GoogleDrive-blongworth@whoi.edu/Shared drives/locness/synthetic_data/loc_01_ship_data.parquet"
+#data_path = "../locness-datamanager/data/locness.db"
 # Default resampling interval for the dropdown
 # Options: "1min", "10min", "1H", etc. or leave empty for no resampling
 default_resampling = "10min"
