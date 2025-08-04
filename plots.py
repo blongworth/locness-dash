@@ -91,22 +91,55 @@ def create_map_plot(df, field):
     if field and field in track_data.columns:
         color_param = field
         color_vals = track_data[color_param]
-        qmin = color_vals.quantile(0.05)
-        qmax = color_vals.quantile(0.95)
+        
+        # For skewed data, use a more sophisticated quantile approach
+        # Define quantile breakpoints to spread colors more evenly
+        quantiles = [0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99]
+        q_values = [color_vals.quantile(q) for q in quantiles]
+        
+        # Use log scale for highly skewed data if the range is large and all values are positive
+        data_range = color_vals.max() - color_vals.min()
+        is_log_suitable = color_vals.min() > 0 and (color_vals.max() / color_vals.min()) > 10
+        
+        if is_log_suitable:
+            # Use log-transformed values for color mapping
+            color_for_map = np.log10(color_vals + 1e-10)  # Add small epsilon to avoid log(0)
+            qmin = np.log10(color_vals.quantile(0.01) + 1e-10)
+            qmax = np.log10(color_vals.quantile(0.99) + 1e-10)
+            
+            # Create custom colorbar with original scale labels
+            tickvals = np.log10(np.array(q_values) + 1e-10)
+            ticktext = [f"{v:.2f}" for v in q_values]
+            
+            colorbar_dict = dict(
+                title=color_param.capitalize(),
+                tickvals=tickvals,
+                ticktext=ticktext
+            )
+        else:
+            # Use percentile-based scaling for better color distribution
+            color_for_map = color_vals
+            qmin = color_vals.quantile(0.01)
+            qmax = color_vals.quantile(0.99)
+            colorbar_dict = dict(title=color_param.capitalize())
+        
         if qmin == qmax:
             qmin = color_vals.min()
             qmax = color_vals.max()
+            color_for_map = color_vals
+            colorbar_dict = dict(title=color_param.capitalize())
+            
         scatter = go.Scattermap(
             lat=track_data['latitude'],
             lon=track_data['longitude'],
             mode='markers+lines',
             marker=dict(
                 size=10,
-                color=color_vals,
+                color=color_for_map,
                 colorscale='Viridis',
                 cmin=qmin,
                 cmax=qmax,
-                colorbar=dict(title=color_param.capitalize()),
+                colorbar=colorbar_dict,
                 showscale=True
             ),
             name=f'Track ({color_param})',
