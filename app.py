@@ -275,12 +275,12 @@ def update_correlation_dropdowns(n, x_value, y_value):
     x_out = (
         x_value
         if x_value in numeric_cols
-        else (numeric_cols[8] if numeric_cols else None)
+        else (numeric_cols[2] if numeric_cols else None)
     )
     y_out = (
         y_value
         if y_value in numeric_cols
-        else (numeric_cols[10] if len(numeric_cols) > 9 else None)
+        else (numeric_cols[3] if len(numeric_cols) > 9 else None)
     )
     return options, x_out, options, y_out
 
