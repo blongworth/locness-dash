@@ -1,9 +1,17 @@
 [locness_dash]
-# Path to the SQLite database file
+# Data source configuration
+# Path to the SQLite database file or Parquet file
 # Example: data_path = "underway_data.db"
+# Example: data_path = "data.parquet"
+# Set to null/empty when using DynamoDB
 #data_path = "/Users/brett/Library/CloudStorage/GoogleDrive-blongworth@whoi.edu/Shared drives/locness/synthetic_data/locness.parquet"
 #data_path = "/Users/brett/Library/CloudStorage/GoogleDrive-blongworth@whoi.edu/Shared drives/locness/synthetic_data/loc_01_ship_data.parquet"
-data_path = "../locness-datamanager/data/locness.db"
+#data_path = "../locness-datamanager/data/locness.db"
+
+# DynamoDB configuration (optional - only use if data_path is empty)
+dynamodb_table = "locness-underway-summary"
+dynamodb_region = "us-east-1"
+
 # Default resampling interval for the dropdown
 # Options: "1min", "10min", "1H", etc. or leave empty for no resampling
 default_resampling = "10s"

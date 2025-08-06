@@ -37,7 +37,16 @@ with open("config.toml", "rb") as f:
 config = toml_config.get("locness_dash", {})
 
 # Initialize data manager
-data_manager = DataManager(config["data_path"])
+# Check if DynamoDB configuration is provided
+if config.get("dynamodb_table"):
+    data_manager = DataManager(
+        data_path=config.get("data_path"),
+        dynamodb_table=config["dynamodb_table"],
+        dynamodb_region=config.get("dynamodb_region", "us-east-1")
+    )
+else:
+    data_manager = DataManager(config["data_path"])
+
 data_manager.load_initial_data()
 
 # Initialize Dash app

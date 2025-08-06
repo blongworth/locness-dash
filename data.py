@@ -1,25 +1,132 @@
 import pandas as pd
 import sqlite3
 import threading
+import boto3
+from boto3.dynamodb.conditions import Key
+from decimal import Decimal
 
 class DataManager:
-    def __init__(self, data_path):
+    def __init__(self, data_path, dynamodb_table=None, dynamodb_region='us-east-1'):
         self.data_path = data_path
+        self.dynamodb_table = dynamodb_table
+        self.dynamodb_region = dynamodb_region
         self.last_datetime_utc = None  # This will store pandas datetime
         self.data = pd.DataFrame()
         self.lock = threading.Lock()
-        self.is_parquet = data_path.endswith(".parquet")
+        self.is_parquet = data_path.endswith(".parquet") if data_path else False
+        self.is_dynamodb = dynamodb_table is not None
+        
+        # Initialize DynamoDB resource if needed
+        if self.is_dynamodb:
+            self.dynamodb = boto3.resource('dynamodb', region_name=self.dynamodb_region)
+            self.table = self.dynamodb.Table(self.dynamodb_table)
 
     def get_connection(self):
         if self.is_parquet:
             raise ValueError("Parquet does not use a database connection.")
+        if self.is_dynamodb:
+            raise ValueError("DynamoDB does not use a traditional database connection.")
         return sqlite3.connect(self.data_path)
+
+    def _convert_dynamodb_timestamps(self, data):
+        """Convert ISO string timestamps from DynamoDB to pandas datetime and handle numeric types"""
+        if not data.empty and "datetime_utc" in data.columns:
+            # Convert ISO string format to pandas datetime
+            data["datetime_utc"] = pd.to_datetime(data["datetime_utc"])
+            
+            # Convert numeric columns from DynamoDB Decimal/string types to proper numeric types
+            # DynamoDB often stores numbers as Decimal objects or strings which need conversion
+            for col in data.columns:
+                if col != "datetime_utc":
+                    # First try to convert from Decimal objects to float
+                    if data[col].dtype == 'object':
+                        # Check if column contains Decimal objects
+                        sample_vals = data[col].dropna().head()
+                        if len(sample_vals) > 0 and isinstance(sample_vals.iloc[0], Decimal):
+                            data[col] = data[col].apply(lambda x: float(x) if isinstance(x, Decimal) else x)
+                    
+                    # Then convert to numeric types, keeping non-numeric as-is
+                    data[col] = pd.to_numeric(data[col], errors='ignore')
+                    
+        return data
+
+    def _query_dynamodb_data(self, start_time=None, limit=None):
+        """Query data from DynamoDB using datetime_utc as partition key"""
+        try:
+            if start_time:
+                # Convert pandas datetime to ISO string for DynamoDB query
+                if hasattr(start_time, 'isoformat'):
+                    start_time_iso = start_time.isoformat()
+                else:
+                    start_time_iso = pd.to_datetime(start_time).isoformat()
+                
+                # Add 'Z' suffix if not present for proper UTC comparison
+                if not start_time_iso.endswith('Z') and '+' not in start_time_iso:
+                    start_time_iso = start_time_iso + 'Z'
+                
+                print(f"DynamoDB: Scanning for datetime_utc > {start_time_iso}")
+                
+                # Use scan with filter for datetime_utc as partition key
+                response = self.table.scan(
+                    FilterExpression=Key('datetime_utc').gt(start_time_iso),
+                    Limit=limit if limit else 1000
+                )
+            else:
+                # Scan entire table for initial load
+                print("DynamoDB: Scanning entire table")
+                response = self.table.scan(Limit=limit if limit else 1000)
+            
+            items = response['Items']
+            
+            # Handle pagination
+            while 'LastEvaluatedKey' in response and len(items) < (limit or 10000):
+                if start_time:
+                    response = self.table.scan(
+                        FilterExpression=Key('datetime_utc').gt(start_time_iso),
+                        ExclusiveStartKey=response['LastEvaluatedKey'],
+                        Limit=(limit - len(items)) if limit else 1000
+                    )
+                else:
+                    response = self.table.scan(
+                        ExclusiveStartKey=response['LastEvaluatedKey'],
+                        Limit=(limit - len(items)) if limit else 1000
+                    )
+                items.extend(response['Items'])
+                
+            print(f"DynamoDB: Retrieved {len(items)} total items")
+                
+            df = pd.DataFrame(items)
+            df = self._convert_dynamodb_timestamps(df)
+            
+            # Additional client-side filtering for precise timestamp filtering
+            if start_time and not df.empty:
+                initial_count = len(df)
+                df = df[df["datetime_utc"] > start_time]
+                print(f"DynamoDB: After timestamp filtering, {len(df)} of {initial_count} rows remain")
+            
+            # Sort by datetime_utc before returning
+            if not df.empty and "datetime_utc" in df.columns:
+                df = df.sort_values("datetime_utc").reset_index(drop=True)
+                print(f"DynamoDB: Sorted {len(df)} rows by datetime_utc")
+                
+                # Debug: Print column data types for troubleshooting dropdown issues
+                print("DynamoDB: Column data types:")
+                for col, dtype in df.dtypes.items():
+                    print(f"  {col}: {dtype}")
+            
+            return df
+            
+        except Exception as e:
+            print(f"Error querying DynamoDB: {e}")
+            return pd.DataFrame()
 
     def load_initial_data(self):
         """Load all existing data from the data source"""
         with self.lock:
             try:
-                if self.is_parquet:
+                if self.is_dynamodb:
+                    self.data = self._query_dynamodb_data()
+                elif self.is_parquet:
                     self.data = pd.read_parquet(self.data_path, engine="pyarrow")
                     # Convert Unix timestamp to datetime if needed
                     if "datetime_utc" in self.data.columns:
@@ -52,7 +159,10 @@ class DataManager:
 
         print(f"Fetching new data after {self.last_datetime_utc} (UTC timestamp)")
         try:
-            if self.is_parquet:
+            if self.is_dynamodb:
+                # Query DynamoDB for new data
+                new_data = self._query_dynamodb_data(start_time=self.last_datetime_utc)
+            elif self.is_parquet:
                 # Filter Parquet data for new entries
                 new_data = pd.read_parquet(self.data_path, engine="pyarrow")
                 # Convert Unix timestamp to datetime if needed
@@ -79,6 +189,7 @@ class DataManager:
                     )
 
             if not new_data.empty:
+                print(f"DataManager: Found {len(new_data)} new rows")
 
                 with self.lock:
                     self.data = pd.concat([self.data, new_data], ignore_index=True)
@@ -167,3 +278,39 @@ class DataManager:
         for col in ["ph_corrected_ma_app", "ph_total_ma_app"]:
             if col in df.columns:
                 self.data[col] = df[col]
+
+    def remove_duplicates(self):
+        """Remove duplicate rows based on datetime_utc, keeping the last occurrence"""
+        with self.lock:
+            if not self.data.empty and "datetime_utc" in self.data.columns:
+                initial_count = len(self.data)
+                self.data = self.data.drop_duplicates(subset=['datetime_utc'], keep='last')
+                final_count = len(self.data)
+                if initial_count != final_count:
+                    print(f"DataManager: Removed {initial_count - final_count} duplicate rows")
+                    # Update last_datetime_utc after deduplication
+                    if not self.data.empty:
+                        self.last_datetime_utc = self.data["datetime_utc"].max()
+
+    def get_data_info(self):
+        """Get information about the current data for debugging"""
+        with self.lock:
+            data = self.data.copy()
+        
+        if data.empty:
+            return "No data loaded"
+        
+        info = {
+            "total_rows": len(data),
+            "data_source": "DynamoDB" if self.is_dynamodb else ("Parquet" if self.is_parquet else "SQLite"),
+            "time_range": f"{data['datetime_utc'].min()} to {data['datetime_utc'].max()}" if "datetime_utc" in data.columns else "No datetime column",
+            "last_datetime_utc": str(self.last_datetime_utc),
+            "columns": list(data.columns),
+        }
+        
+        # Check for duplicates
+        if "datetime_utc" in data.columns:
+            duplicate_count = data['datetime_utc'].duplicated().sum()
+            info["duplicate_timestamps"] = duplicate_count
+        
+        return info
