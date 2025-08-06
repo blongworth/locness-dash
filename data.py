@@ -46,9 +46,64 @@ class DataManager:
                             data[col] = data[col].apply(lambda x: float(x) if isinstance(x, Decimal) else x)
                     
                     # Then convert to numeric types, keeping non-numeric as-is
-                    data[col] = pd.to_numeric(data[col], errors='ignore')
+                    data[col] = pd.to_numeric(data[col])
                     
         return data
+
+    def _ensure_proper_dtypes(self, df):
+        """Ensure all columns have proper pandas dtypes for DynamoDB data"""
+        print("DynamoDB: Converting data types to proper pandas dtypes")
+        
+        for col in df.columns:
+            if col == "datetime_utc":
+                # Ensure datetime_utc is datetime64[ns]
+                if not pd.api.types.is_datetime64_any_dtype(df[col]):
+                    df[col] = pd.to_datetime(df[col])
+                    print(f"  {col}: converted to datetime64[ns]")
+                continue
+                
+            # Handle other columns
+            original_dtype = df[col].dtype
+            
+            # Skip if already numeric
+            if pd.api.types.is_numeric_dtype(df[col]):
+                continue
+                
+            # Try to convert object/string columns to numeric
+            if df[col].dtype == 'object':
+                # First handle Decimal objects from DynamoDB
+                if df[col].dropna().empty:
+                    continue
+                    
+                sample_val = df[col].dropna().iloc[0]
+                
+                # Convert Decimal objects to float
+                if isinstance(sample_val, Decimal):
+                    df[col] = df[col].apply(lambda x: float(x) if isinstance(x, Decimal) and x is not None else x)
+                
+                # Try numeric conversion
+                numeric_converted = pd.to_numeric(df[col], errors='coerce')
+                
+                # If conversion was successful (not all NaN), use it
+                if not numeric_converted.isna().all():
+                    # Check if we should use int or float
+                    if numeric_converted.dropna().apply(lambda x: x.is_integer()).all():
+                        # Try to convert to int64 if all values are integers
+                        try:
+                            df[col] = numeric_converted.astype('Int64')  # Nullable integer
+                            print(f"  {col}: {original_dtype} -> Int64")
+                        except Exception:
+                            df[col] = numeric_converted.astype('float64')
+                            print(f"  {col}: {original_dtype} -> float64")
+                    else:
+                        df[col] = numeric_converted.astype('float64')
+                        print(f"  {col}: {original_dtype} -> float64")
+                else:
+                    # Keep as string if numeric conversion failed
+                    df[col] = df[col].astype('string')
+                    print(f"  {col}: {original_dtype} -> string")
+                    
+        return df
 
     def _query_dynamodb_data(self, start_time=None, limit=None):
         """Query data from DynamoDB using datetime_utc as partition key"""
@@ -98,6 +153,10 @@ class DataManager:
             df = pd.DataFrame(items)
             df = self._convert_dynamodb_timestamps(df)
             
+            # Convert all DynamoDB data types to proper pandas dtypes
+            if not df.empty:
+                df = self._ensure_proper_dtypes(df)
+            
             # Additional client-side filtering for precise timestamp filtering
             if start_time and not df.empty:
                 initial_count = len(df)
@@ -110,7 +169,7 @@ class DataManager:
                 print(f"DynamoDB: Sorted {len(df)} rows by datetime_utc")
                 
                 # Debug: Print column data types for troubleshooting dropdown issues
-                print("DynamoDB: Column data types:")
+                print("DynamoDB: Final column data types:")
                 for col, dtype in df.dtypes.items():
                     print(f"  {col}: {dtype}")
             
