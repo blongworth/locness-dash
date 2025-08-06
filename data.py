@@ -102,6 +102,11 @@ class DataManager:
         if data.empty:
             return data
 
+        print(f"DataManager.get_data: Original data shape: {data.shape}")
+        if not data.empty and "datetime_utc" in data.columns:
+            print(f"DataManager.get_data: Data time range: {data['datetime_utc'].min()} to {data['datetime_utc'].max()}")
+        print(f"DataManager.get_data: Filter start_time: {start_time}, end_time: {end_time}")
+
         # Add moving averages
         # TODO: Checkbox to turn on/off moving averages
         self.add_2min_moving_averages()
@@ -111,12 +116,20 @@ class DataManager:
             # Ensure start_time is a pandas datetime
             if not isinstance(start_time, pd.Timestamp):
                 start_time = pd.to_datetime(start_time)
+            # Convert to timezone-naive if data is timezone-naive
+            if start_time.tz is not None and data["datetime_utc"].dt.tz is None:
+                start_time = start_time.tz_convert(None)
             data = data[data["datetime_utc"] >= start_time]
+            print(f"DataManager.get_data: After start_time filter: {data.shape}")
         if end_time:
             # Ensure end_time is a pandas datetime
             if not isinstance(end_time, pd.Timestamp):
                 end_time = pd.to_datetime(end_time)
+            # Convert to timezone-naive if data is timezone-naive
+            if end_time.tz is not None and data["datetime_utc"].dt.tz is None:
+                end_time = end_time.tz_convert(None)
             data = data[data["datetime_utc"] <= end_time]
+            print(f"DataManager.get_data: After end_time filter: {data.shape}")
 
         # Remove 'partition' column if it exists
         if "partition" in data.columns:
@@ -129,6 +142,7 @@ class DataManager:
             resampled_data.reset_index(inplace=True)
             data = resampled_data
 
+        print(f"DataManager.get_data: Final data shape: {data.shape}")
         return data
 
     def add_2min_moving_averages(self):

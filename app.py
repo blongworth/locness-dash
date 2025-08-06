@@ -1,5 +1,5 @@
 import tomllib
-from datetime import datetime
+from datetime import datetime, timezone
 import threading
 import time
 import pandas as pd
@@ -122,6 +122,7 @@ app.layout = html.Div([
                         dcc.Dropdown(
                             id="resample-dropdown",
                             options=[
+                                {"label": "No Resampling", "value": "None"}, # intolerable
                                 {"label": "10 Seconds", "value": "10s"},
                                 {"label": "1 Minute", "value": "1min"},
                                 {"label": "10 Minutes", "value": "10min"},
@@ -314,8 +315,8 @@ def update_correlation_and_bland_altman(
         slider_max = datetime_utcs.max().timestamp()
         start_ts = max(slider_min, min(time_range_slider[0], slider_max))
         end_ts = slider_max
-        start_time = datetime.fromtimestamp(start_ts)
-        end_time = datetime.fromtimestamp(end_ts)
+        start_time = datetime.fromtimestamp(start_ts, tz=timezone.utc)
+        end_time = datetime.fromtimestamp(end_ts, tz=timezone.utc)
         if resample_freq == "None":
             data = data_manager.get_data(start_time, end_time)
         else:
@@ -404,8 +405,8 @@ def update_time_slider(n, current_value):
         slider_min = int(min_ts)
         slider_max = int(max_ts)
         marks = {
-            slider_min: datetime.fromtimestamp(slider_min).strftime("%Y-%m-%d %H:%M"),
-            slider_max: datetime.fromtimestamp(slider_max).strftime("%Y-%m-%d %H:%M"),
+            slider_min: datetime.fromtimestamp(slider_min, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
+            slider_max: datetime.fromtimestamp(slider_max, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
         }
         # If current_value is valid, preserve it
         if (
@@ -475,8 +476,8 @@ def update_plots(
         end_ts = slider_max
         # end_ts = max(slider_min, min(time_range_slider[1], slider_max))
         # Convert Unix timestamps to datetime
-        start_time = datetime.fromtimestamp(start_ts)
-        end_time = datetime.fromtimestamp(end_ts)
+        start_time = datetime.fromtimestamp(start_ts, tz=timezone.utc)
+        end_time = datetime.fromtimestamp(end_ts, tz=timezone.utc)
     else:
         start_time = None
         end_time = None
