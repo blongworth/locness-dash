@@ -142,6 +142,18 @@ app.layout = html.Div([
                             className="mb-3"
                         ),
                         dbc.Label("Time Range:"),
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Button(
+                                    "Auto-Update: OFF",
+                                    id="auto-update-toggle",
+                                    color="secondary",
+                                    size="sm",
+                                    outline=True,
+                                    className="mb-2"
+                                )
+                            ], width=12)
+                        ]),
                         dcc.RangeSlider(
                             id="time-range-slider",
                             min=0, max=1, step=1, value=[0, 1],
@@ -236,6 +248,7 @@ app.layout = html.Div([
         ]),
         dcc.Store(id="last-update-time"),
         dcc.Store(id="time-range-store"),
+        dcc.Store(id="auto-update-state", data=False),  # Store for auto-update toggle state
         dcc.Interval(id="interval-component", interval=config["update_interval"] * 1000, n_intervals=0),
     ], fluid=True)
 ], id="app-container")
@@ -395,6 +408,27 @@ def update_dropdown_options(n, ts_value, map_value):
     return ts_options, ts_value_out, map_options, map_value_out
 
 
+# Callback to handle auto-update toggle button
+@app.callback(
+    [
+        Output("auto-update-toggle", "children"),
+        Output("auto-update-toggle", "color"),
+        Output("auto-update-state", "data"),
+    ],
+    [Input("auto-update-toggle", "n_clicks")],
+    [State("auto-update-state", "data")],
+)
+def toggle_auto_update(n_clicks, current_state):
+    if n_clicks is None:
+        return "Auto-Update: OFF", "secondary", False
+    
+    new_state = not current_state
+    if new_state:
+        return "Auto-Update: ON", "success", True
+    else:
+        return "Auto-Update: OFF", "secondary", False
+
+
 # Callback to update time range slider properties
 @app.callback(
     [
@@ -404,9 +438,12 @@ def update_dropdown_options(n, ts_value, map_value):
         Output("time-range-slider", "value"),
     ],
     [Input("interval-component", "n_intervals")],
-    [State("time-range-slider", "value")],
+    [
+        State("time-range-slider", "value"),
+        State("auto-update-state", "data"),
+    ],
 )
-def update_time_slider(n, current_value):
+def update_time_slider(n, current_value, auto_update):
     if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns:
         datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
         min_ts = datetime_utcs.min().timestamp()
@@ -417,16 +454,31 @@ def update_time_slider(n, current_value):
             slider_min: datetime.fromtimestamp(slider_min, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
             slider_max: datetime.fromtimestamp(slider_max, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
         }
-        # If current_value is valid, preserve it
-        if (
-            isinstance(current_value, list)
-            and len(current_value) == 2
-            and slider_min <= current_value[0] <= slider_max
-            and slider_min <= current_value[1] <= slider_max
-        ):
-            slider_value = current_value
+        
+        # Determine slider value based on auto-update state
+        if auto_update:
+            # Auto-update mode: always show from user's start time to latest data
+            if (
+                isinstance(current_value, list)
+                and len(current_value) == 2
+                and slider_min <= current_value[0] <= slider_max
+            ):
+                # Keep the user's start time, but update end time to latest
+                slider_value = [current_value[0], slider_max]
+            else:
+                # Default to full range if current value is invalid
+                slider_value = [slider_min, slider_max]
         else:
-            slider_value = [slider_min, slider_max]
+            # Fixed mode: preserve user's selection if valid
+            if (
+                isinstance(current_value, list)
+                and len(current_value) == 2
+                and slider_min <= current_value[0] <= slider_max
+                and slider_min <= current_value[1] <= slider_max
+            ):
+                slider_value = current_value
+            else:
+                slider_value = [slider_min, slider_max]
     else:
         slider_min = 0
         slider_max = 1
