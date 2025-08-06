@@ -305,12 +305,51 @@ class DataManager:
         if "partition" in data.columns:
             data = data.drop(columns=["partition"])
 
-        # Resample if requested
+        # Resample if requested (downsampling only - never upsample)
         if resample_freq and not data.empty:
-            data.set_index("datetime_utc", inplace=True)
-            resampled_data = data.resample(resample_freq).mean()
-            resampled_data.reset_index(inplace=True)
-            data = resampled_data
+            print(f"DataManager.get_data: Resampling to {resample_freq} from {data.shape}")
+            
+            # Calculate the actual data frequency to prevent upsampling
+            if len(data) > 1:
+                data_sorted = data.sort_values("datetime_utc")
+                time_diffs = data_sorted["datetime_utc"].diff().dropna()
+                median_interval = time_diffs.median()
+                print(f"DataManager.get_data: Median data interval: {median_interval}")
+                
+                # Convert resample frequency to timedelta for comparison
+                import re
+                freq_match = re.match(r'(\d+)([a-zA-Z]+)', resample_freq)
+                if freq_match:
+                    freq_value = int(freq_match.group(1))
+                    freq_unit = freq_match.group(2).lower()
+                    
+                    # Convert to seconds for comparison
+                    unit_to_seconds = {
+                        's': 1, 'sec': 1, 'second': 1, 'seconds': 1,
+                        't': 60, 'min': 60, 'minute': 60, 'minutes': 60,
+                        'h': 3600, 'hour': 3600, 'hours': 3600,
+                        'd': 86400, 'day': 86400, 'days': 86400
+                    }
+                    
+                    requested_seconds = freq_value * unit_to_seconds.get(freq_unit, 60)  # default to minutes
+                    median_seconds = median_interval.total_seconds()
+                    
+                    print(f"DataManager.get_data: Requested interval: {requested_seconds}s, Data interval: {median_seconds:.1f}s")
+                    
+                    # Only resample if requested frequency is LOWER (larger interval) than data frequency
+                    if requested_seconds > median_seconds:
+                        print(f"DataManager.get_data: Downsampling from {median_seconds:.1f}s to {requested_seconds}s")
+                        data.set_index("datetime_utc", inplace=True)
+                        resampled_data = data.resample(resample_freq).mean()
+                        resampled_data.reset_index(inplace=True)
+                        data = resampled_data
+                        print(f"DataManager.get_data: After resampling shape: {data.shape}")
+                    else:
+                        print("DataManager.get_data: Skipping resampling - would upsample data (not allowed)")
+                else:
+                    print(f"DataManager.get_data: Could not parse resample frequency '{resample_freq}', skipping")
+            else:
+                print("DataManager.get_data: Not enough data points for resampling frequency analysis")
 
         print(f"DataManager.get_data: Final data shape: {data.shape}")
         return data
