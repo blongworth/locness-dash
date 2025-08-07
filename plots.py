@@ -113,8 +113,6 @@ def create_dispersal_plot(data, template="bootstrap"):
     dispersal_fig.update_layout(
         template=template,
         title="Dispersal View Timeseries",
-        uirevision="dispersal-timeseries-constant",
-        transition={"duration": 100},
         yaxis1_title="pH",  # Label for pH subplot
         yaxis2_title="Rho [ppb]",  # Label for Rho subplot
         legend=dict(
@@ -128,23 +126,23 @@ def create_dispersal_plot(data, template="bootstrap"):
     )
 
     # Update x-axes to add padding and prevent edge collision
-    dispersal_fig.update_xaxes(
-        row=1, col=1, rangeslider=dict(visible=False), type="date", automargin=True
-    )
-    dispersal_fig.update_xaxes(
-        row=2, col=1, rangeslider=dict(visible=False), type="date", automargin=True
-    )
+    # dispersal_fig.update_xaxes(
+    #     row=1, col=1, rangeslider=dict(visible=False), type="date", automargin=True
+    # )
+    # dispersal_fig.update_xaxes(
+    #     row=2, col=1, rangeslider=dict(visible=False), type="date", automargin=True
+    # )
 
-    # Add some padding to prevent data from touching the edges
-    if not data.empty and "datetime_utc" in data.columns:
-        time_range = data["datetime_utc"].max() - data["datetime_utc"].min()
-        padding = time_range * 0.02  # 2% padding on each side
-        dispersal_fig.update_xaxes(
-            range=[
-                data["datetime_utc"].min() - padding,
-                data["datetime_utc"].max() + padding,
-            ]
-        )
+    # # Add some padding to prevent data from touching the edges
+    # if not data.empty and "datetime_utc" in data.columns:
+    #     time_range = data["datetime_utc"].max() - data["datetime_utc"].min()
+    #     padding = time_range * 0.02  # 2% padding on each side
+    #     dispersal_fig.update_xaxes(
+    #         range=[
+    #             data["datetime_utc"].min() - padding,
+    #             data["datetime_utc"].max() + padding,
+    #         ]
+    #     )
 
     return dispersal_fig
 

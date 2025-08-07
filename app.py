@@ -592,8 +592,21 @@ def update_plots(
             transition={"duration": 100},  # Disable animations to reduce visual jumps
         )
 
+    # if all_ts_fig:
+    #     all_ts_fig.update_layout(
+    #         uirevision="all-fields-constant",
+    #         transition={"duration": 100},  # Disable animations to reduce visual jumps
+    #     )
+
     # Create a custom timeseries plot for the Dispersal View
     dispersal_fig = create_dispersal_plot(data, template=template)
+
+    # Set uirevision for dispersal plot to ensure it updates properly
+    if dispersal_fig:
+        dispersal_fig.update_layout(
+            uirevision="dispersal-timeseries-constant",
+            transition={"duration": 100},  # Disable animations to reduce visual jumps
+        )
 
     # Get the most recent timestamp from the data
     most_recent_timestamp = (
