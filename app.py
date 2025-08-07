@@ -1,4 +1,5 @@
 import tomllib
+import logging
 from datetime import datetime, timezone
 import threading
 import time
@@ -19,15 +20,19 @@ from plots import (
 )
 
 # TODO: test automatic updates of all plots and data
-# TODO: Add data to traces rather than redrawing entire plot
-# TODO: local server
 # TODO: prevent "too much data"
 # TODO: test no network connection
-# TODO: calculate ph ma here and compare to ph_corrected_ma
-# TODO: dark mode
-# TODO: Diagnostics View
+# TODO: fix jitter
+# TODO: remove app-calculated ph ma once tested
 # TODO: Add data to traces rather than redrawing entire plot
 
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("locness_dash")
 
 # Load configuration from config.toml
 with open("config.toml", "rb") as f:
@@ -36,18 +41,24 @@ with open("config.toml", "rb") as f:
 # Use the top-level [locness_dash] section in config.toml
 config = toml_config.get("locness_dash", {})
 
-# Initialize data manager
-# Check if DynamoDB configuration is provided
-if config.get("dynamodb_table"):
-    data_manager = DataManager(
-        data_path=config.get("data_path"),
-        dynamodb_table=config["dynamodb_table"],
-        dynamodb_region=config.get("dynamodb_region", "us-east-1")
-    )
-else:
-    data_manager = DataManager(config["data_path"])
 
-data_manager.load_initial_data()
+# Initialize data manager
+try:
+    if config.get("dynamodb_table"):
+        logger.info("Initializing DataManager with DynamoDB table '%s' in region '%s'", config["dynamodb_table"], config.get("dynamodb_region", "us-east-1"))
+        data_manager = DataManager(
+            data_path=config.get("data_path"),
+            dynamodb_table=config["dynamodb_table"],
+            dynamodb_region=config.get("dynamodb_region", "us-east-1")
+        )
+    else:
+        logger.info("Initializing DataManager with data_path '%s'", config.get("data_path"))
+        data_manager = DataManager(config["data_path"])
+    data_manager.load_initial_data()
+    logger.info("Initial data loaded successfully.")
+except Exception as e:
+    logger.error("Failed to initialize DataManager: %s", e, exc_info=True)
+    raise
 
 # Initialize Dash app
 dark_theme = "darkly"
@@ -639,14 +650,18 @@ def update_value_boxes(n_intervals):
 
 
 # Background thread to check for new data
+
 def background_update():
     while True:
         time.sleep(config["update_interval"])
-        new_data = data_manager.get_new_data()
-        if not new_data.empty:
-            print(f"Retrieved {len(new_data)} new records")
-        else:
-            print("No new data available")
+        try:
+            new_data = data_manager.get_new_data()
+            if not new_data.empty:
+                logger.info("Retrieved %d new records", len(new_data))
+            else:
+                logger.info("No new data available")
+        except Exception as e:
+            logger.warning("Error during background update: %s", e, exc_info=True)
 
 
 # Start background thread
@@ -656,5 +671,9 @@ update_thread.start()
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 8050))
-    app.run(debug=False, host="0.0.0.0", port=port)
+    logger.info("Starting LOCNESS Dash app on port %d", port)
+    try:
+        app.run(debug=False, host="0.0.0.0", port=port)
+    except Exception as e:
+        logger.error("App failed to start: %s", e, exc_info=True)
 

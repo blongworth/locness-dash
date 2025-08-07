@@ -4,6 +4,10 @@ import threading
 import boto3
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal
+import logging
+
+# Use the same logger name as in app.py for consistency
+logger = logging.getLogger("locness_dash.data")
 
 class DataManager:
     def __init__(self, data_path, dynamodb_table=None, dynamodb_region='us-east-1'):
@@ -52,14 +56,14 @@ class DataManager:
 
     def _ensure_proper_dtypes(self, df):
         """Ensure all columns have proper pandas dtypes for DynamoDB data"""
-        print("DynamoDB: Converting data types to proper pandas dtypes")
+        logger.debug("DynamoDB: Converting data types to proper pandas dtypes")
         
         for col in df.columns:
             if col == "datetime_utc":
                 # Ensure datetime_utc is datetime64[ns]
                 if not pd.api.types.is_datetime64_any_dtype(df[col]):
                     df[col] = pd.to_datetime(df[col])
-                    print(f"  {col}: converted to datetime64[ns]")
+                    logger.debug(f"  {col}: converted to datetime64[ns]")
                 continue
                 
             # Handle other columns
@@ -91,17 +95,17 @@ class DataManager:
                         # Try to convert to int64 if all values are integers
                         try:
                             df[col] = numeric_converted.astype('Int64')  # Nullable integer
-                            print(f"  {col}: {original_dtype} -> Int64")
+                            logger.debug(f"  {col}: {original_dtype} -> Int64")
                         except Exception:
                             df[col] = numeric_converted.astype('float64')
-                            print(f"  {col}: {original_dtype} -> float64")
+                            logger.debug(f"  {col}: {original_dtype} -> float64")
                     else:
                         df[col] = numeric_converted.astype('float64')
-                        print(f"  {col}: {original_dtype} -> float64")
+                        logger.debug(f"  {col}: {original_dtype} -> float64")
                 else:
                     # Keep as string if numeric conversion failed
                     df[col] = df[col].astype('string')
-                    print(f"  {col}: {original_dtype} -> string")
+                    logger.debug(f"  {col}: {original_dtype} -> string")
                     
         return df
 
@@ -119,7 +123,7 @@ class DataManager:
                 if not start_time_iso.endswith('Z') and '+' not in start_time_iso:
                     start_time_iso = start_time_iso + 'Z'
                 
-                print(f"DynamoDB: Scanning for datetime_utc > {start_time_iso}")
+                logger.debug(f"DynamoDB: Scanning for datetime_utc > {start_time_iso}")
                 
                 # Use scan with filter for datetime_utc as partition key
                 response = self.table.scan(
@@ -128,7 +132,7 @@ class DataManager:
                 )
             else:
                 # Scan entire table for initial load
-                print("DynamoDB: Scanning entire table")
+                logger.debug("DynamoDB: Scanning entire table")
                 response = self.table.scan(Limit=limit if limit else 1000)
             
             items = response['Items']
@@ -148,7 +152,7 @@ class DataManager:
                     )
                 items.extend(response['Items'])
                 
-            print(f"DynamoDB: Retrieved {len(items)} total items")
+            logger.debug(f"DynamoDB: Retrieved {len(items)} total items")
                 
             df = pd.DataFrame(items)
             df = self._convert_dynamodb_timestamps(df)
@@ -161,22 +165,22 @@ class DataManager:
             if start_time and not df.empty:
                 initial_count = len(df)
                 df = df[df["datetime_utc"] > start_time]
-                print(f"DynamoDB: After timestamp filtering, {len(df)} of {initial_count} rows remain")
+                logger.debug(f"DynamoDB: After timestamp filtering, {len(df)} of {initial_count} rows remain")
             
             # Sort by datetime_utc before returning
             if not df.empty and "datetime_utc" in df.columns:
                 df = df.sort_values("datetime_utc").reset_index(drop=True)
-                print(f"DynamoDB: Sorted {len(df)} rows by datetime_utc")
+                logger.debug(f"DynamoDB: Sorted {len(df)} rows by datetime_utc")
                 
                 # Debug: Print column data types for troubleshooting dropdown issues
-                print("DynamoDB: Final column data types:")
+                logger.debug("DynamoDB: Final column data types:")
                 for col, dtype in df.dtypes.items():
-                    print(f"  {col}: {dtype}")
+                    logger.debug(f"  {col}: {dtype}")
             
             return df
             
         except Exception as e:
-            print(f"Error querying DynamoDB: {e}")
+            logger.error(f"Error querying DynamoDB: {e}", exc_info=True)
             return pd.DataFrame()
 
     def load_initial_data(self):
@@ -208,7 +212,7 @@ class DataManager:
                     self.last_datetime_utc = self.data["datetime_utc"].max()
 
             except Exception as e:
-                print(f"Error loading initial data: {e}")
+                logger.error(f"Error loading initial data: {e}", exc_info=True)
                 self.data = pd.DataFrame()
 
     def get_new_data(self):
@@ -216,7 +220,7 @@ class DataManager:
         if self.last_datetime_utc is None:
             return pd.DataFrame()
 
-        print(f"Fetching new data after {self.last_datetime_utc} (UTC timestamp)")
+        logger.info(f"Fetching new data after {self.last_datetime_utc} (UTC timestamp)")
         try:
             if self.is_dynamodb:
                 # Query DynamoDB for new data
@@ -248,19 +252,19 @@ class DataManager:
                     )
 
             if not new_data.empty:
-                print(f"DataManager: Found {len(new_data)} new rows")
+                logger.debug(f"DataManager: Found {len(new_data)} new rows")
 
                 with self.lock:
                     self.data = pd.concat([self.data, new_data], ignore_index=True)
                     # Update last_datetime_utc to the maximum datetime in the new data
                     self.last_datetime_utc = new_data["datetime_utc"].max()
 
-                print(f"DataManager: data shape after append: {self.data.shape}")
-                print(f"DataManager: last_datetime_utc updated to {self.last_datetime_utc}")
+                logger.debug(f"DataManager: data shape after append: {self.data.shape}")
+                logger.debug(f"DataManager: last_datetime_utc updated to {self.last_datetime_utc}")
 
                 return new_data
         except Exception as e:
-            print(f"Error getting new data: {e}")
+            logger.error(f"Error getting new data: {e}", exc_info=True)
 
         return pd.DataFrame()
 
@@ -272,10 +276,10 @@ class DataManager:
         if data.empty:
             return data
 
-        print(f"DataManager.get_data: Original data shape: {data.shape}")
+        logger.debug(f"DataManager.get_data: Original data shape: {data.shape}")
         if not data.empty and "datetime_utc" in data.columns:
-            print(f"DataManager.get_data: Data time range: {data['datetime_utc'].min()} to {data['datetime_utc'].max()}")
-        print(f"DataManager.get_data: Filter start_time: {start_time}, end_time: {end_time}")
+            logger.debug(f"DataManager.get_data: Data time range: {data['datetime_utc'].min()} to {data['datetime_utc'].max()}")
+        logger.debug(f"DataManager.get_data: Filter start_time: {start_time}, end_time: {end_time}")
 
         # Add moving averages
         # TODO: Checkbox to turn on/off moving averages
@@ -290,7 +294,7 @@ class DataManager:
             if start_time.tz is not None and data["datetime_utc"].dt.tz is None:
                 start_time = start_time.tz_convert(None)
             data = data[data["datetime_utc"] >= start_time]
-            print(f"DataManager.get_data: After start_time filter: {data.shape}")
+            logger.debug(f"DataManager.get_data: After start_time filter: {data.shape}")
         if end_time:
             # Ensure end_time is a pandas datetime
             if not isinstance(end_time, pd.Timestamp):
@@ -299,7 +303,7 @@ class DataManager:
             if end_time.tz is not None and data["datetime_utc"].dt.tz is None:
                 end_time = end_time.tz_convert(None)
             data = data[data["datetime_utc"] <= end_time]
-            print(f"DataManager.get_data: After end_time filter: {data.shape}")
+            logger.debug(f"DataManager.get_data: After end_time filter: {data.shape}")
 
         # Remove 'partition' column if it exists
         if "partition" in data.columns:
@@ -307,14 +311,14 @@ class DataManager:
 
         # Resample if requested (downsampling only - never upsample)
         if resample_freq and not data.empty:
-            print(f"DataManager.get_data: Resampling to {resample_freq} from {data.shape}")
+            logger.debug(f"DataManager.get_data: Resampling to {resample_freq} from {data.shape}")
             
             # Calculate the actual data frequency to prevent upsampling
             if len(data) > 1:
                 data_sorted = data.sort_values("datetime_utc")
                 time_diffs = data_sorted["datetime_utc"].diff().dropna()
                 median_interval = time_diffs.median()
-                print(f"DataManager.get_data: Median data interval: {median_interval}")
+                logger.debug(f"DataManager.get_data: Median data interval: {median_interval}")
                 
                 # Convert resample frequency to timedelta for comparison
                 import re
@@ -334,24 +338,24 @@ class DataManager:
                     requested_seconds = freq_value * unit_to_seconds.get(freq_unit, 60)  # default to minutes
                     median_seconds = median_interval.total_seconds()
                     
-                    print(f"DataManager.get_data: Requested interval: {requested_seconds}s, Data interval: {median_seconds:.1f}s")
+                    logger.debug(f"DataManager.get_data: Requested interval: {requested_seconds}s, Data interval: {median_seconds:.1f}s")
                     
                     # Only resample if requested frequency is LOWER (larger interval) than data frequency
                     if requested_seconds > median_seconds:
-                        print(f"DataManager.get_data: Downsampling from {median_seconds:.1f}s to {requested_seconds}s")
+                        logger.debug(f"DataManager.get_data: Downsampling from {median_seconds:.1f}s to {requested_seconds}s")
                         data.set_index("datetime_utc", inplace=True)
                         resampled_data = data.resample(resample_freq).mean()
                         resampled_data.reset_index(inplace=True)
                         data = resampled_data
-                        print(f"DataManager.get_data: After resampling shape: {data.shape}")
+                        logger.debug(f"DataManager.get_data: After resampling shape: {data.shape}")
                     else:
-                        print("DataManager.get_data: Skipping resampling - would upsample data (not allowed)")
+                        logger.debug("DataManager.get_data: Skipping resampling - would upsample data (not allowed)")
                 else:
-                    print(f"DataManager.get_data: Could not parse resample frequency '{resample_freq}', skipping")
+                    logger.warning(f"DataManager.get_data: Could not parse resample frequency '{resample_freq}', skipping")
             else:
-                print("DataManager.get_data: Not enough data points for resampling frequency analysis")
+                logger.warning("DataManager.get_data: Not enough data points for resampling frequency analysis")
 
-        print(f"DataManager.get_data: Final data shape: {data.shape}")
+        logger.debug(f"DataManager.get_data: Final data shape: {data.shape}")
         return data
 
     def add_2min_moving_averages(self):
@@ -385,7 +389,7 @@ class DataManager:
                 self.data = self.data.drop_duplicates(subset=['datetime_utc'], keep='last')
                 final_count = len(self.data)
                 if initial_count != final_count:
-                    print(f"DataManager: Removed {initial_count - final_count} duplicate rows")
+                    logger.warning(f"DataManager: Removed {initial_count - final_count} duplicate rows")
                     # Update last_datetime_utc after deduplication
                     if not self.data.empty:
                         self.last_datetime_utc = self.data["datetime_utc"].max()
