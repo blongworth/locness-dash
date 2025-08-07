@@ -163,7 +163,7 @@ app.layout = html.Div([
                         ),
                         dbc.Switch(
                             id="time-range-mode",
-                            label="Last 12h",
+                            label="Last 4h",
                             value=True,
                             className="mb-2",
                             persistence=True,
@@ -525,9 +525,9 @@ def update_plots(
         slider_max = datetime_utcs.max().timestamp()
         
         # Calculate default range based on time-range-mode switch
-        if time_range_mode:  # Last 12h mode
-            twelve_hours_ago = slider_max - 12 * 3600
-            default_start = max(slider_min, int(twelve_hours_ago))
+        if time_range_mode:  # Last 4h mode
+            four_hours_ago = slider_max - 4 * 3600
+            default_start = max(slider_min, int(four_hours_ago))
             default_range = [default_start, slider_max]
         else:  # All data mode
             default_range = [slider_min, slider_max]
