@@ -1,6 +1,5 @@
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
-import plotly.express as px
 import numpy as np
 
 
@@ -16,7 +15,7 @@ def create_timeseries_plot(data, fields, subplot_height=200, template="bootstrap
         rows=n_fields,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.05,
+        #vertical_spacing=0.01,
     )
 
     for i, field in enumerate(fields):
@@ -40,7 +39,7 @@ def create_timeseries_plot(data, fields, subplot_height=200, template="bootstrap
         template=template,
         height=150 + subplot_height * len(fields),
         showlegend=False,
-        # margin=dict(t=10, b=10, l=10, r=10)  # Adjust margins to reduce whitespace
+        margin=dict(t=10, b=10, l=10, r=10)  # Adjust margins to reduce whitespace
     )
     for i in range(1, len(fields) + 1):
         fig.update_xaxes(
@@ -129,23 +128,23 @@ def create_dispersal_plot(data, template="bootstrap"):
     )
 
     # Update x-axes to add padding and prevent edge collision
-    #dispersal_fig.update_xaxes(
-    #    row=1, col=1, rangeslider=dict(visible=False), type="date", automargin=True
-    #)
-    #dispersal_fig.update_xaxes(
-    #    row=2, col=1, rangeslider=dict(visible=False), type="date", automargin=True
-    #)
+    dispersal_fig.update_xaxes(
+        row=1, col=1, rangeslider=dict(visible=False), type="date", automargin=True
+    )
+    dispersal_fig.update_xaxes(
+        row=2, col=1, rangeslider=dict(visible=False), type="date", automargin=True
+    )
 
     # Add some padding to prevent data from touching the edges
-    #if not data.empty and "datetime_utc" in data.columns:
-    #    time_range = data["datetime_utc"].max() - data["datetime_utc"].min()
-    #    padding = time_range * 0.02  # 2% padding on each side
-    #    dispersal_fig.update_xaxes(
-    #        range=[
-    #            data["datetime_utc"].min() - padding,
-    #            data["datetime_utc"].max() + padding,
-    #        ]
-    #    )
+    if not data.empty and "datetime_utc" in data.columns:
+        time_range = data["datetime_utc"].max() - data["datetime_utc"].min()
+        padding = time_range * 0.02  # 2% padding on each side
+        dispersal_fig.update_xaxes(
+            range=[
+                data["datetime_utc"].min() - padding,
+                data["datetime_utc"].max() + padding,
+            ]
+        )
 
     return dispersal_fig
 

@@ -210,12 +210,15 @@ app.layout = html.Div([
                         ])
                     ]),
                     dbc.Tab(label="Main View", tab_id="main", children=[
-                        dcc.Graph(id="map-plot", style={"height": "40vh", "minHeight": "300px"}),
-                        dcc.Graph(id="timeseries-plot", style={"height": "40vh", "minHeight": "300px"})
+                        dcc.Graph(id="map-plot", style={"height": "80vh", "minHeight": "300px"}),
+                        dcc.Graph(id="timeseries-plot",
+                                  #style={"height": "40vh", "minHeight": "300px"}
+                                  )
                     ]),
                     dbc.Tab(label="All Fields Timeseries", tab_id="all-fields", children=[
                         dcc.Graph(id="all-fields-timeseries-plot", 
-                                 style={"height": "80vh", "minHeight": "600px"})
+                                 #style={"height": "80vh", "minHeight": "600px"}
+                                 )
                     ]),
                     dbc.Tab(label="Correlation", tab_id="correlation", children=[
                         dbc.Row([
