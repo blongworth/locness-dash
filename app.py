@@ -6,7 +6,7 @@ import time
 import pandas as pd
 
 import dash
-from dash import dcc, html, Input, Output, State
+from dash import dcc, html, Input, Output, State, ctx
 import dash_bootstrap_components as dbc
 from dash_bootstrap_templates import ThemeSwitchAIO
 
@@ -153,18 +153,22 @@ app.layout = html.Div([
                             className="mb-3"
                         ),
                         dbc.Label("Time Range:"),
-                        dbc.Row([
-                            dbc.Col([
-                                dbc.Button(
-                                    "Auto-Update: OFF",
-                                    id="auto-update-toggle",
-                                    color="secondary",
-                                    size="sm",
-                                    outline=True,
-                                    className="mb-2"
-                                )
-                            ], width=12)
-                        ]),
+                        dbc.Switch(
+                            id="auto-update-toggle",
+                            label="Auto-Update",
+                            value=False,
+                            className="mb-2",
+                            persistence=True,
+                            persistence_type="session"
+                        ),
+                        dbc.Switch(
+                            id="time-range-mode",
+                            label="Last 12h",
+                            value=True,
+                            className="mb-2",
+                            persistence=True,
+                            persistence_type="session"
+                        ),
                         dcc.RangeSlider(
                             id="time-range-slider",
                             min=0, max=1, step=1, value=[0, 1],
@@ -262,7 +266,6 @@ app.layout = html.Div([
         ]),
         dcc.Store(id="last-update-time"),
         dcc.Store(id="time-range-store"),
-        dcc.Store(id="auto-update-state", data=False),  # Store for auto-update toggle state
         dcc.Interval(id="interval-component", interval=config["update_interval"] * 1000, n_intervals=0),
     ], fluid=True)
 ], id="app-container")
@@ -335,10 +338,12 @@ def update_correlation_dropdowns(n, x_value, y_value):
         Input("correlation-y-dropdown", "value"),
         Input("resample-dropdown", "value"),
         Input("time-range-slider", "value"),
+        Input("time-range-mode", "value"),
+        Input("auto-update-toggle", "value"),
     ],
 )
 def update_correlation_and_bland_altman(
-    toggle, n_intervals, x_col, y_col, resample_freq, time_range_slider
+    toggle, n_intervals, x_col, y_col, resample_freq, time_range_slider, time_range_mode, auto_update
 ):
     # theme template
     template = light_theme if toggle else dark_theme
@@ -422,42 +427,17 @@ def update_dropdown_options(n, ts_value, map_value):
     return ts_options, ts_value_out, map_options, map_value_out
 
 
-# Callback to handle auto-update toggle button
-@app.callback(
-    [
-        Output("auto-update-toggle", "children"),
-        Output("auto-update-toggle", "color"),
-        Output("auto-update-state", "data"),
-    ],
-    [Input("auto-update-toggle", "n_clicks")],
-    [State("auto-update-state", "data")],
-)
-def toggle_auto_update(n_clicks, current_state):
-    if n_clicks is None:
-        return "Auto-Update: OFF", "secondary", False
-    
-    new_state = not current_state
-    if new_state:
-        return "Auto-Update: ON", "success", True
-    else:
-        return "Auto-Update: OFF", "secondary", False
 
-
-# Callback to update time range slider properties
+# Callback to update time range slider properties (simplified - no value logic)
 @app.callback(
     [
         Output("time-range-slider", "min"),
         Output("time-range-slider", "max"),
         Output("time-range-slider", "marks"),
-        Output("time-range-slider", "value"),
     ],
     [Input("interval-component", "n_intervals")],
-    [
-        State("time-range-slider", "value"),
-        State("auto-update-state", "data"),
-    ],
 )
-def update_time_slider(n, current_value, auto_update):
+def update_time_slider_properties(n):
     if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns:
         datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
         min_ts = datetime_utcs.min().timestamp()
@@ -468,40 +448,14 @@ def update_time_slider(n, current_value, auto_update):
             slider_min: datetime.fromtimestamp(slider_min, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
             slider_max: datetime.fromtimestamp(slider_max, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
         }
-        
-        # Determine slider value based on auto-update state
-        if auto_update:
-            # Auto-update mode: always show from user's start time to latest data
-            if (
-                isinstance(current_value, list)
-                and len(current_value) == 2
-                and slider_min <= current_value[0] <= slider_max
-            ):
-                # Keep the user's start time, but update end time to latest
-                slider_value = [current_value[0], slider_max]
-            else:
-                # Default to full range if current value is invalid
-                slider_value = [slider_min, slider_max]
-        else:
-            # Fixed mode: preserve user's selection if valid
-            if (
-                isinstance(current_value, list)
-                and len(current_value) == 2
-                and slider_min <= current_value[0] <= slider_max
-                and slider_min <= current_value[1] <= slider_max
-            ):
-                slider_value = current_value
-            else:
-                slider_value = [slider_min, slider_max]
     else:
         slider_min = 0
         slider_max = 1
         marks = {}
-        slider_value = [0, 1]
-    return slider_min, slider_max, marks, slider_value
+    return slider_min, slider_max, marks
 
 
-# Callback to update plots
+# Callback to update plots and time slider value
 @app.callback(
     [
         Output("timeseries-plot", "figure"),
@@ -515,6 +469,7 @@ def update_time_slider(n, current_value, auto_update):
         Output("most-recent-timestamp-display", "children"),
         Output("total-rows-all-data", "children"),
         Output("total-rows-filtered", "children"),
+        Output("time-range-slider", "value"),
     ],
     [
         Input(ThemeSwitchAIO.ids.switch("theme"), "value"),
@@ -523,11 +478,14 @@ def update_time_slider(n, current_value, auto_update):
         Input("map-field-dropdown", "value"),
         Input("resample-dropdown", "value"),
         Input("time-range-slider", "value"),
+        Input("time-range-mode", "value"),
+        Input("auto-update-toggle", "value"),
     ],
     [
         State("last-update-time", "data"),
         State("time-range-store", "data"),
     ],
+    prevent_initial_call=False,
 )
 def update_plots(
     toggle,
@@ -536,26 +494,71 @@ def update_plots(
     map_field,
     resample_freq,
     time_range_slider,
+    time_range_mode,
+    auto_update,
     last_update,
     stored_time_range,
 ):
     # theme template
     template = light_theme if toggle else dark_theme
 
+    # Check what triggered this callback
+    triggered_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
+    switch_triggered = triggered_id in ["time-range-mode", "auto-update-toggle"]
+    
+    # Determine time range based on switches and slider
     if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns:
         datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
         slider_min = datetime_utcs.min().timestamp()
         slider_max = datetime_utcs.max().timestamp()
-        # Clamp slider values
-        start_ts = max(slider_min, min(time_range_slider[0], slider_max))
-        end_ts = slider_max
-        # end_ts = max(slider_min, min(time_range_slider[1], slider_max))
-        # Convert Unix timestamps to datetime
+        
+        # Calculate default range based on time-range-mode switch
+        if time_range_mode:  # Last 12h mode
+            twelve_hours_ago = slider_max - 12 * 3600
+            default_start = max(slider_min, int(twelve_hours_ago))
+            default_range = [default_start, slider_max]
+        else:  # All data mode
+            default_range = [slider_min, slider_max]
+        
+        # Determine actual time range based on what triggered the callback
+        if switch_triggered:
+            # Switch was changed - use the default range for the new switch state
+            actual_range = default_range
+        elif auto_update:
+            # Auto-update mode: keep user's start time, update end to latest
+            if (
+                isinstance(time_range_slider, list)
+                and len(time_range_slider) == 2
+                and slider_min <= time_range_slider[0] <= slider_max
+            ):
+                # Keep user's start time, but update end time to latest
+                actual_range = [time_range_slider[0], slider_max]
+            else:
+                actual_range = default_range
+        else:
+            # Fixed mode: use slider value if valid, otherwise use default
+            if (
+                isinstance(time_range_slider, list)
+                and len(time_range_slider) == 2
+                and slider_min <= time_range_slider[0] <= slider_max
+                and slider_min <= time_range_slider[1] <= slider_max
+            ):
+                actual_range = time_range_slider
+            else:
+                actual_range = default_range
+        
+        # Convert to datetime objects
+        start_ts = max(slider_min, min(actual_range[0], slider_max))
+        end_ts = slider_max  # Always end at latest data
         start_time = datetime.fromtimestamp(start_ts, tz=timezone.utc)
         end_time = datetime.fromtimestamp(end_ts, tz=timezone.utc)
+        
+        # Set the slider value to what we're actually using
+        slider_value = actual_range
     else:
         start_time = None
         end_time = None
+        slider_value = [0, 1]
 
     # Add check for resample_freq is None
     if resample_freq == "None":
@@ -620,6 +623,7 @@ def update_plots(
         f"{most_recent_timestamp_iso}",
         f"{total_rows_all_data}",
         f"{total_rows_filtered}",
+        slider_value,
     )
 
 
@@ -673,7 +677,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
     logger.info("Starting LOCNESS Dash app on port %d", port)
     try:
-        app.run(debug=False, host="0.0.0.0", port=port)
+        app.run(debug=True, host="0.0.0.0", port=port)
     except Exception as e:
         logger.error("App failed to start: %s", e, exc_info=True)
 
