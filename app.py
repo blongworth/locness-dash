@@ -156,7 +156,7 @@ app.layout = html.Div([
                         dbc.Switch(
                             id="auto-update-toggle",
                             label="Auto-Update",
-                            value=False,
+                            value=True,
                             className="mb-2",
                             persistence=True,
                             persistence_type="session"
@@ -363,14 +363,26 @@ def update_correlation_and_bland_altman(
         else:
             data = data_manager.get_data(start_time, end_time, resample_freq)
         fig_corr = create_correlation_plot(data, x_col, y_col, template=template)
+        fig_ba = create_bland_altman_plot(data, x_col, y_col, template=template)
+        
+        # Determine uirevision strategy based on auto-update mode
+        if auto_update:
+            # In auto-update mode, use data-dependent uirevision to allow updates when new data arrives
+            data_hash = f"{len(data)}-{n_intervals}"
+            corr_uirevision = f"correlation-auto-{data_hash}"
+            ba_uirevision = f"bland-altman-auto-{data_hash}"
+        else:
+            # In fixed mode, use constant uirevision to preserve user interactions
+            corr_uirevision = "correlation-constant"
+            ba_uirevision = "bland-altman-constant"
+        
         if fig_corr:
             fig_corr.update_layout(
-                uirevision="correlation-constant", transition={"duration": 100}
+                uirevision=corr_uirevision, transition={"duration": 100}
             )
-        fig_ba = create_bland_altman_plot(data, x_col, y_col, template=template)
         if fig_ba:
             fig_ba.update_layout(
-                uirevision="bland-altman-constant", transition={"duration": 100}
+                uirevision=ba_uirevision, transition={"duration": 100}
             )
         return fig_corr, fig_ba
     return {}, {}
@@ -579,32 +591,48 @@ def update_plots(
     fields = [col for col in data.columns if col not in exclude]
     all_ts_fig = create_timeseries_plot(data, fields, template=template)
 
-    # Set uirevision immediately during creation to minimize jumps
+    # Determine uirevision strategy based on auto-update mode
+    if auto_update:
+        # In auto-update mode, use data-dependent uirevision to allow updates when new data arrives
+        # This ensures plots redraw only when there's actually new data, not on every callback
+        data_hash = f"{total_rows_all_data}-{n_intervals}"
+        ts_uirevision = f"timeseries-auto-{data_hash}"
+        map_uirevision = f"map-auto-{data_hash}"
+        dispersal_uirevision = f"dispersal-auto-{data_hash}"
+        all_fields_uirevision = f"all-fields-auto-{data_hash}"
+    else:
+        # In fixed mode, use constant uirevision to preserve all user interactions
+        ts_uirevision = "timeseries-constant"
+        map_uirevision = "map-constant"
+        dispersal_uirevision = "dispersal-timeseries-constant"
+        all_fields_uirevision = "all-fields-constant"
+
+    # Set uirevision based on auto-update mode
     if ts_fig:
         ts_fig.update_layout(
-            uirevision="timeseries-constant",
+            uirevision=ts_uirevision,
             transition={"duration": 100},  # Disable animations to reduce visual jumps
         )
 
     if map_fig:
         map_fig.update_layout(
-            uirevision="map-constant",
+            uirevision=map_uirevision,
             transition={"duration": 100},  # Disable animations to reduce visual jumps
         )
 
-    # if all_ts_fig:
-    #     all_ts_fig.update_layout(
-    #         uirevision="all-fields-constant",
-    #         transition={"duration": 100},  # Disable animations to reduce visual jumps
-    #     )
+    if all_ts_fig:
+        all_ts_fig.update_layout(
+            uirevision=all_fields_uirevision,
+            transition={"duration": 100},  # Disable animations to reduce visual jumps
+        )
 
     # Create a custom timeseries plot for the Dispersal View
     dispersal_fig = create_dispersal_plot(data, template=template)
 
-    # Set uirevision for dispersal plot to ensure it updates properly
+    # Set uirevision for dispersal plot
     if dispersal_fig:
         dispersal_fig.update_layout(
-            uirevision="dispersal-timeseries-constant",
+            uirevision=dispersal_uirevision,
             transition={"duration": 100},  # Disable animations to reduce visual jumps
         )
 
