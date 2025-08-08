@@ -186,6 +186,8 @@ app.layout = html.Div([
                                        html.Span(id="total-rows-all-data")]),
                                 html.P([dbc.Badge("Total rows (filtered):", color="info", className="me-2"), 
                                        html.Span(id="total-rows-filtered")]),
+                                html.P([dbc.Badge("Missing rows (all):", color="info", className="me-2"), 
+                                       html.Span(id="missing-rows-all-data")]),
                             ])
                         ], color="light", outline=True)
                     ])
@@ -480,6 +482,7 @@ def update_time_slider_properties(n):
         Output("last-update-display", "children"),
         Output("most-recent-timestamp-display", "children"),
         Output("total-rows-all-data", "children"),
+        Output("missing-rows-all-data", "children"),
         Output("total-rows-filtered", "children"),
         Output("time-range-slider", "value"),
     ],
@@ -580,6 +583,7 @@ def update_plots(
 
     # Calculate total rows
     total_rows_all_data = len(data_manager.data)
+    missing_rows_all_data = data_manager.data.isnull().any(axis=1).sum()
     total_rows_filtered = len(data)
 
     # Create plots with uirevision set from the beginning
@@ -663,6 +667,7 @@ def update_plots(
         f"{current_time}",
         f"{most_recent_timestamp_iso}",
         f"{total_rows_all_data}",
+        f"{missing_rows_all_data}",
         f"{total_rows_filtered}",
         slider_value,
     )
