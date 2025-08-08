@@ -687,13 +687,13 @@ def update_value_boxes(n_intervals):
     
     if not data_manager.data.empty:
         if "ph_corrected_ma" in data_manager.data.columns:
-            latest_ph = data_manager.data["ph_corrected_ma"].iloc[-1]
+            latest_ph = data_manager.data["ph_corrected_ma"].dropna().iloc[-1]
             ph_val = f"{latest_ph:.2f}"
             # Use Bootstrap text colors
             if latest_ph > 8:
                 ph_style = {"fontSize": "2.5rem", "fontWeight": "bold", "color": "red"}
         if "rho_ppb" in data_manager.data.columns:
-            latest_rho = data_manager.data["rho_ppb"].iloc[-1]
+            latest_rho = data_manager.data["rho_ppb"].dropna().iloc[-1]
             rho_val = f"{latest_rho:.1f}"
     
     return ph_val, ph_style, rho_val, rho_style
