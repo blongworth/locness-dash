@@ -35,8 +35,9 @@ class DataManager:
     def _convert_dynamodb_timestamps(self, data):
         """Convert ISO string timestamps from DynamoDB to pandas datetime and handle numeric types"""
         if not data.empty and "datetime_utc" in data.columns:
-            # Convert ISO string format to pandas datetime
-            data["datetime_utc"] = pd.to_datetime(data["datetime_utc"])
+            # Convert ISO string format to pandas datetime with explicit format
+            # DynamoDB timestamp format: 2025-08-09T02:37:42Z
+            data["datetime_utc"] = pd.to_datetime(data["datetime_utc"], format='%Y-%m-%dT%H:%M:%SZ', utc=True)
             
             # Convert numeric columns from DynamoDB Decimal/string types to proper numeric types
             # DynamoDB often stores numbers as Decimal objects or strings which need conversion
