@@ -177,15 +177,15 @@ def create_map_plot(df, field, template="bootstrap", style=None):
         lon_range = max_lon - min_lon
         max_range = max(lat_range, lon_range)
         if max_range < 0.002:
-            zoom = 15
+            zoom = 19
         elif max_range < 0.01:
-            zoom = 13
+            zoom = 17
         elif max_range < 0.05:
-            zoom = 11
+            zoom = 15
         elif max_range < 0.2:
-            zoom = 9
+            zoom = 13
         else:
-            zoom = 7
+            zoom = 11
     else:
         center_lat, center_lon = 42.3601, -71.0589
         zoom = 12
@@ -248,9 +248,11 @@ def create_map_plot(df, field, template="bootstrap", style=None):
             ),
             name=f"Track ({color_param})",
             text=[f"{color_param}: {v:.2f}" for v in color_vals],
-            hovertemplate="Lat: %{latitude:.4f}<br>"
-            + "Lon: %{longitude:.4f}<br>"
-            + f"{color_param}: %{{marker.color:.2f}}<extra></extra>",
+            hovertemplate=
+            "Timestamp: %{customdata[0]}<br>"
+            + "Lat: %{lat:.4f}          Lon: %{lon:.4f}<br>"
+            + f"{color_param}: %{{text}}<extra></extra>",
+            customdata=[[dt.strftime('%Y-%m-%d %H:%M:%S')] for dt in track_data["datetime_utc"]],
         )
         fig.add_trace(scatter)
     else:
@@ -265,19 +267,18 @@ def create_map_plot(df, field, template="bootstrap", style=None):
             )
         )
     if not df.empty:
-        latest = df.iloc[-1]
+        latest = df.dropna().iloc[-1]
         fig.add_trace(
             go.Scattermap(
-                lat=[latest["latitude"]],
-                lon=[latest["longitude"]],
-                mode="markers",
-                marker=dict(size=15, color="red"),
-                name="Current Position",
-                hovertemplate="<b>Current Position</b><br>"
-                + "Lat: %{latitude:.4f}<br>"
-                + "Lon: %{longitude:.4f}<br>"
-                + f"Rho: {latest['rho_ppb']:.1f} ppb<br>"
-                + f"Average pH: {latest['ph_corrected_ma']:.2f}<extra></extra>",
+            lat=[latest["latitude"]],
+            lon=[latest["longitude"]],
+            mode="markers",
+            marker=dict(size=15, color="red"),
+            name="Current Position",
+            hovertemplate="<b>Current Position</b><br>"
+            + f"Timestamp: {latest['datetime_utc'].strftime('%Y-%m-%d %H:%M:%S')}<br>"
+            + f"Lat: {latest['latitude']:.4f}          Lon: {latest['longitude']:.4f}<br>"
+            + f"Rho: {latest['rho_ppb']:.1f} ppb        Average pH: {latest['ph_corrected_ma']:.2f}",
             )
         )
 
