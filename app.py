@@ -161,11 +161,22 @@ app.layout = html.Div([
                             persistence=True,
                             persistence_type="session"
                         ),
-                        dbc.Switch(
+                        dbc.Label("Data Range:", className="mb-1"),
+                        dcc.Slider(
                             id="time-range-mode",
-                            label="Last 4h",
-                            value=True,
-                            className="mb-2",
+                            min=0,
+                            max=5,
+                            step=1,
+                            value=3,  # Default to 4h
+                            marks={
+                                0: {"label": "All", "style": {"fontSize": "12px"}},
+                                1: {"label": "24h", "style": {"fontSize": "12px"}},
+                                2: {"label": "8h", "style": {"fontSize": "12px"}},
+                                3: {"label": "4h", "style": {"fontSize": "12px"}},
+                                4: {"label": "2h", "style": {"fontSize": "12px"}},
+                                5: {"label": "1h", "style": {"fontSize": "12px"}}
+                            },
+                            className="mb-3",
                             persistence=True,
                             persistence_type="session"
                         ),
@@ -519,7 +530,7 @@ def update_plots(
 
     # Check what triggered this callback
     triggered_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
-    switch_triggered = triggered_id in ["time-range-mode", "auto-update-toggle"]
+    slider_triggered = triggered_id in ["time-range-mode", "auto-update-toggle"]
     
     # Determine time range based on switches and slider
     if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns:
@@ -527,17 +538,38 @@ def update_plots(
         slider_min = datetime_utcs.min().timestamp()
         slider_max = datetime_utcs.max().timestamp()
         
-        # Calculate default range based on time-range-mode switch
-        if time_range_mode:  # Last 4h mode
-            four_hours_ago = slider_max - 4 * 3600
-            default_start = max(slider_min, int(four_hours_ago))
-            default_range = [default_start, slider_max]
-        else:  # All data mode
+        # Calculate default range based on time-range-mode slider
+        # time_range_mode values: 0=All, 1=24h, 2=8h, 3=4h, 4=2h, 5=1h
+        if time_range_mode == 0:  # All data
             default_range = [slider_min, slider_max]
+        elif time_range_mode == 1:  # 24 hours
+            hours_ago = slider_max - 24 * 3600
+            default_start = max(slider_min, int(hours_ago))
+            default_range = [default_start, slider_max]
+        elif time_range_mode == 2:  # 8 hours
+            hours_ago = slider_max - 8 * 3600
+            default_start = max(slider_min, int(hours_ago))
+            default_range = [default_start, slider_max]
+        elif time_range_mode == 3:  # 4 hours
+            hours_ago = slider_max - 4 * 3600
+            default_start = max(slider_min, int(hours_ago))
+            default_range = [default_start, slider_max]
+        elif time_range_mode == 4:  # 2 hours
+            hours_ago = slider_max - 2 * 3600
+            default_start = max(slider_min, int(hours_ago))
+            default_range = [default_start, slider_max]
+        elif time_range_mode == 5:  # 1 hour
+            hours_ago = slider_max - 1 * 3600
+            default_start = max(slider_min, int(hours_ago))
+            default_range = [default_start, slider_max]
+        else:  # Default fallback to 4h
+            hours_ago = slider_max - 4 * 3600
+            default_start = max(slider_min, int(hours_ago))
+            default_range = [default_start, slider_max]
         
         # Determine actual time range based on what triggered the callback
-        if switch_triggered:
-            # Switch was changed - use the default range for the new switch state
+        if slider_triggered:
+            # Slider was changed - use the default range for the new slider state
             actual_range = default_range
         elif auto_update:
             # Auto-update mode: keep user's start time, update end to latest
