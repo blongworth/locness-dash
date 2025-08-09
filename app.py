@@ -289,42 +289,141 @@ def update_bootstrap_theme(toggle):
     return "light" if toggle else "dark"
 
 
-# Callback to update correlation dropdown options
-@app.callback(
-    [
-        Output("correlation-x-dropdown", "options"),
-        Output("correlation-x-dropdown", "value"),
-        Output("correlation-y-dropdown", "options"),
-        Output("correlation-y-dropdown", "value"),
-    ],
-    [Input("interval-component", "n_intervals")],
-    [
-        State("correlation-x-dropdown", "value"),
-        State("correlation-y-dropdown", "value"),
-    ],
-)
-def update_correlation_dropdowns(n, x_value, y_value):
+# Helper function to get numeric columns for dropdowns
+def get_numeric_columns():
+    """Get numeric columns suitable for correlation analysis"""
     if data_manager.data.empty:
-        return [], None, [], None
+        return []
     exclude = ["id", "datetime_utc", "timestamp"]
-    numeric_cols = [
+    return [
         col
         for col in data_manager.data.columns
         if col not in exclude and data_manager.data[col].dtype in ["float64", "int64"]
     ]
-    options = [{"label": col, "value": col} for col in numeric_cols]
-    # Set defaults if current value is not valid
+
+
+# Consolidated callback for all interval-triggered updates
+# This callback replaces multiple individual callbacks that were all triggered by interval-component
+# to avoid duplicate data access and improve performance. It handles:
+# - Dropdown options and values for timeseries, map, and correlation fields
+# - Time slider properties (min, max, marks) 
+# - Value boxes for pH and rho display
+@app.callback(
+    [
+        # Dropdown options outputs
+        Output("timeseries-fields-dropdown", "options"),
+        Output("timeseries-fields-dropdown", "value"),
+        Output("map-field-dropdown", "options"),
+        Output("map-field-dropdown", "value"),
+        Output("correlation-x-dropdown", "options"),
+        Output("correlation-x-dropdown", "value"),
+        Output("correlation-y-dropdown", "options"),
+        Output("correlation-y-dropdown", "value"),
+        # Time slider outputs
+        Output("time-range-slider", "min"),
+        Output("time-range-slider", "max"),
+        Output("time-range-slider", "marks"),
+        # Value box outputs
+        Output("ph-value", "children"),
+        Output("ph-value", "style"),
+        Output("rho-value", "children"),
+        Output("rho-value", "style"),
+    ],
+    [Input("interval-component", "n_intervals")],
+    [
+        State("timeseries-fields-dropdown", "value"),
+        State("map-field-dropdown", "value"),
+        State("correlation-x-dropdown", "value"),
+        State("correlation-y-dropdown", "value"),
+    ],
+)
+def update_interval_triggered_components(n, ts_value, map_value, x_value, y_value):
+    """Consolidated callback for all components that update on interval"""
+    
+    # Get available fields
+    ts_fields = get_available_fields()
+    map_fields = get_map_fields()
+    numeric_cols = get_numeric_columns()
+    
+    # Timeseries dropdown updates
+    ts_options = [{"label": field, "value": field} for field in ts_fields]
+    ts_default = ["rho_ppb", "ph_corrected_ma"]
+    
+    if (
+        not ts_value
+        or not isinstance(ts_value, list)
+        or not any(val in ts_fields for val in ts_value)
+    ):
+        ts_value_out = [val for val in ts_default if val in ts_fields]
+    else:
+        ts_value_out = [val for val in ts_value if val in ts_fields]
+        if not ts_value_out:
+            ts_value_out = [val for val in ts_default if val in ts_fields]
+    
+    # Map dropdown updates
+    map_options = [{"label": field, "value": field} for field in map_fields]
+    map_default = "rho_ppb"
+    
+    if not map_value or map_value not in map_fields:
+        map_value_out = (
+            map_default
+            if map_default in map_fields
+            else (map_fields[0] if map_fields else None)
+        )
+    else:
+        map_value_out = map_value
+    
+    # Correlation dropdown updates
+    corr_options = [{"label": col, "value": col} for col in numeric_cols]
     x_out = (
         x_value
         if x_value in numeric_cols
-        else (numeric_cols[2] if numeric_cols else None)
+        else (numeric_cols[2] if len(numeric_cols) > 2 else None)
     )
     y_out = (
         y_value
         if y_value in numeric_cols
-        else (numeric_cols[3] if len(numeric_cols) > 9 else None)
+        else (numeric_cols[3] if len(numeric_cols) > 3 else None)
     )
-    return options, x_out, options, y_out
+    
+    # Time slider updates
+    if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns:
+        datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
+        min_ts = datetime_utcs.min().timestamp()
+        max_ts = datetime_utcs.max().timestamp()
+        slider_min = int(min_ts)
+        slider_max = int(max_ts)
+        marks = {
+            slider_min: datetime.fromtimestamp(slider_min, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
+            slider_max: datetime.fromtimestamp(slider_max, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
+        }
+    else:
+        slider_min = 0
+        slider_max = 1
+        marks = {}
+    
+    # Value box updates
+    ph_val = "No Data"
+    ph_style = {"fontSize": "2.5rem", "fontWeight": "bold"}
+    rho_val = "No Data"
+    rho_style = {"fontSize": "2.5rem", "fontWeight": "bold"}
+    
+    if not data_manager.data.empty:
+        if "ph_corrected_ma" in data_manager.data.columns:
+            latest_ph = data_manager.data["ph_corrected_ma"].dropna().iloc[-1]
+            ph_val = f"{latest_ph:.2f}"
+            if latest_ph > 8:
+                ph_style = {"fontSize": "2.5rem", "fontWeight": "bold", "color": "red"}
+        if "rho_ppb" in data_manager.data.columns:
+            latest_rho = data_manager.data["rho_ppb"].dropna().iloc[-1]
+            rho_val = f"{latest_rho:.1f}"
+    
+    return (
+        ts_options, ts_value_out, map_options, map_value_out,
+        corr_options, x_out, corr_options, y_out,
+        slider_min, slider_max, marks,
+        ph_val, ph_style, rho_val, rho_style
+    )
 
 
 # Callback to update correlation scatterplot and Bland-Altman plot
@@ -390,83 +489,11 @@ def update_correlation_and_bland_altman(
     return {}, {}
 
 
-# Callback to update dropdown options and set default values
-@app.callback(
-    [
-        Output("timeseries-fields-dropdown", "options"),
-        Output("timeseries-fields-dropdown", "value"),
-        Output("map-field-dropdown", "options"),
-        Output("map-field-dropdown", "value"),
-    ],
-    [Input("interval-component", "n_intervals")],
-    [
-        State("timeseries-fields-dropdown", "value"),
-        State("map-field-dropdown", "value"),
-    ],
-)
-def update_dropdown_options(n, ts_value, map_value):
-    ts_fields = get_available_fields()
-    map_fields = get_map_fields()
-
-    ts_options = [{"label": field, "value": field} for field in ts_fields]
-    map_options = [{"label": field, "value": field} for field in map_fields]
-
-    # Set defaults if current value is empty or not in available fields
-    ts_default = ["rho_ppb", "ph_corrected_ma"]
-    map_default = "rho_ppb"
-
-    # Validate timeseries value
-    if (
-        not ts_value
-        or not isinstance(ts_value, list)
-        or not any(val in ts_fields for val in ts_value)
-    ):
-        ts_value_out = [val for val in ts_default if val in ts_fields]
-    else:
-        # Only keep values that are still valid
-        ts_value_out = [val for val in ts_value if val in ts_fields]
-        if not ts_value_out:
-            ts_value_out = [val for val in ts_default if val in ts_fields]
-
-    # Validate map value
-    if not map_value or map_value not in map_fields:
-        map_value_out = (
-            map_default
-            if map_default in map_fields
-            else (map_fields[0] if map_fields else None)
-        )
-    else:
-        map_value_out = map_value
-
-    return ts_options, ts_value_out, map_options, map_value_out
 
 
 
-# Callback to update time range slider properties (simplified - no value logic)
-@app.callback(
-    [
-        Output("time-range-slider", "min"),
-        Output("time-range-slider", "max"),
-        Output("time-range-slider", "marks"),
-    ],
-    [Input("interval-component", "n_intervals")],
-)
-def update_time_slider_properties(n):
-    if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns:
-        datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
-        min_ts = datetime_utcs.min().timestamp()
-        max_ts = datetime_utcs.max().timestamp()
-        slider_min = int(min_ts)
-        slider_max = int(max_ts)
-        marks = {
-            slider_min: datetime.fromtimestamp(slider_min, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
-            slider_max: datetime.fromtimestamp(slider_max, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
-        }
-    else:
-        slider_min = 0
-        slider_max = 1
-        marks = {}
-    return slider_min, slider_max, marks
+
+
 
 
 # Callback to update plots and time slider value
@@ -675,30 +702,7 @@ def update_plots(
     )
 
 
-# Simplified value boxes callback
-@app.callback(
-    [Output("ph-value", "children"), Output("ph-value", "style"),
-     Output("rho-value", "children"), Output("rho-value", "style")],
-    [Input("interval-component", "n_intervals")]
-)
-def update_value_boxes(n_intervals):
-    ph_val = "No Data"
-    ph_style = {"fontSize": "2.5rem", "fontWeight": "bold"}
-    rho_val = "No Data"
-    rho_style = {"fontSize": "2.5rem", "fontWeight": "bold"}
-    
-    if not data_manager.data.empty:
-        if "ph_corrected_ma" in data_manager.data.columns:
-            latest_ph = data_manager.data["ph_corrected_ma"].dropna().iloc[-1]
-            ph_val = f"{latest_ph:.2f}"
-            # Use Bootstrap text colors
-            if latest_ph > 8:
-                ph_style = {"fontSize": "2.5rem", "fontWeight": "bold", "color": "red"}
-        if "rho_ppb" in data_manager.data.columns:
-            latest_rho = data_manager.data["rho_ppb"].dropna().iloc[-1]
-            rho_val = f"{latest_rho:.1f}"
-    
-    return ph_val, ph_style, rho_val, rho_style
+
 
 
 # Background thread to check for new data
