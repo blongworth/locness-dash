@@ -286,7 +286,7 @@ class DataManager:
         if missing_before > 0:
             logger.warning(f"DataManager.get_data: Missing values before dropna: {missing_before}")
             data = data.dropna()
-            logger.debug(f"DataManager.get_data: After dropna: {data.shape}")
+            logger.info(f"DataManager.get_data: After dropna: {data.shape}")
 
         # Add moving averages
         # TODO: Checkbox to turn on/off moving averages
