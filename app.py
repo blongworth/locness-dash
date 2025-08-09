@@ -452,6 +452,23 @@ def update_dropdown_options(n, ts_value, map_value):
     return ts_options, ts_value_out, map_options, map_value_out
 
 
+# Callback to auto-adjust resample frequency based on time range
+@app.callback(
+    Output("resample-dropdown", "value"),
+    [Input("time-range-mode", "value")],
+    [State("resample-dropdown", "value")],
+)
+def update_resample_frequency(time_range_mode, current_resample):
+    # Only auto-adjust if user hasn't manually changed from a preset value
+    # time_range_mode values: 0=All, 1=24h, 2=8h, 3=4h, 4=2h, 5=1h
+    if time_range_mode in [4, 5]:  # 2h or 1h - no resampling for short ranges
+        return "None"
+    elif time_range_mode == 3:  # 4h - use 10s resampling
+        return "10s"
+    elif time_range_mode in [0, 1, 2]:  # 24h or 8h - use 1min resampling
+        return "1min"
+    else:  # Default to 10min for any other case
+        return "1min"
 
 # Callback to update time range slider properties (simplified - no value logic)
 @app.callback(
