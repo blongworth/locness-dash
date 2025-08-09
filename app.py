@@ -583,6 +583,8 @@ def update_plots(
 
     # Calculate total rows
     total_rows_all_data = len(data_manager.data)
+    
+    # Calculate number of rows with any missing data
     missing_rows_all_data = data_manager.data.isnull().any(axis=1).sum()
     total_rows_filtered = len(data)
 

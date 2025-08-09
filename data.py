@@ -281,12 +281,10 @@ class DataManager:
             logger.debug(f"DataManager.get_data: Data time range: {data['datetime_utc'].min()} to {data['datetime_utc'].max()}")
         logger.debug(f"DataManager.get_data: Filter start_time: {start_time}, end_time: {end_time}")
         
-        # Drop rows with any missing data
+        # log missing data
         missing_before = data.isnull().sum().sum()
         if missing_before > 0:
             logger.warning(f"DataManager.get_data: Missing values before dropna: {missing_before}")
-            data = data.dropna()
-            logger.info(f"DataManager.get_data: After dropna: {data.shape}")
 
         # Add moving averages
         # TODO: Checkbox to turn on/off moving averages
