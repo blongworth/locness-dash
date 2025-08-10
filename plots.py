@@ -1,6 +1,7 @@
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import numpy as np
+import pandas as pd
 
 
 def create_timeseries_plot(data, fields, subplot_height=200, template="bootstrap"):
@@ -266,21 +267,39 @@ def create_map_plot(df, field, template="bootstrap", style=None):
                 hoverinfo="skip",
             )
         )
+    # Add current position marker
     if not df.empty:
-        latest = df.dropna().iloc[-1]
-        fig.add_trace(
-            go.Scattermap(
-            lat=[latest["latitude"]],
-            lon=[latest["longitude"]],
-            mode="markers",
-            marker=dict(size=15, color="red"),
-            name="Current Position",
-            hovertemplate="<b>Current Position</b><br>"
-            + f"Timestamp: {latest['datetime_utc'].strftime('%Y-%m-%d %H:%M:%S')}<br>"
-            + f"Lat: {latest['latitude']:.4f}          Lon: {latest['longitude']:.4f}<br>"
-            + f"Rho: {latest['rho_ppb']:.1f} ppb        Average pH: {latest['ph_corrected_ma']:.2f}",
+        # Get the latest position with valid coordinates
+        position_data = df.dropna(subset=['latitude', 'longitude', 'datetime_utc'])
+        if not position_data.empty:
+            latest = position_data.iloc[-1]
+            
+            # Build hover text with available data
+            hover_parts = [
+                "<b>Current Position</b>",
+                f"Timestamp: {latest['datetime_utc'].strftime('%Y-%m-%d %H:%M:%S')}",
+                f"Lat: {latest['latitude']:.4f}          Lon: {latest['longitude']:.4f}"
+            ]
+            
+            # Add oceanographic data if available
+            if 'rho_ppb' in latest.index and not pd.isna(latest['rho_ppb']):
+                hover_parts.append(f"Rho: {latest['rho_ppb']:.1f} ppb")
+            
+            ph_field = 'ph_corrected_ma' if 'ph_corrected_ma' in latest.index and not pd.isna(latest['ph_corrected_ma']) else 'ph_corrected'
+            if ph_field in latest.index and not pd.isna(latest[ph_field]):
+                ph_label = "Average pH" if ph_field == 'ph_corrected_ma' else "pH"
+                hover_parts.append(f"{ph_label}: {latest[ph_field]:.2f}")
+            
+            fig.add_trace(
+                go.Scattermap(
+                    lat=[latest["latitude"]],
+                    lon=[latest["longitude"]],
+                    mode="markers",
+                    marker=dict(size=15, color="red"),
+                    name="Current Position",
+                    hovertemplate="<br>".join(hover_parts) + "<extra></extra>",
+                )
             )
-        )
 
     fig.update_layout(
         template=template,
@@ -341,7 +360,6 @@ def create_bland_altman_plot(data, col1, col2, template="bootstrap"):
     ):
         return {}
     x = data[[col1, col2]].dropna()
-    mean_vals = x[[col1, col2]].mean(axis=1)
     diff_vals = x[col1] - x[col2]
     mean_diff = diff_vals.mean()
     std_diff = diff_vals.std()
