@@ -167,7 +167,6 @@ app.layout = html.Div([
                             clearable=False,
                             className="mb-3"
                         ),
-                        dbc.Label("Time Range:"),
                         dbc.Switch(
                             id="auto-update-toggle",
                             label="Auto-Update",
@@ -176,6 +175,7 @@ app.layout = html.Div([
                             persistence=True,
                             persistence_type="session"
                         ),
+                        dbc.Label("Time Range:"),
                         dcc.Slider(
                             id="time-range-mode",
                             min=0, max=5, step=1, value=3,
@@ -186,6 +186,7 @@ app.layout = html.Div([
                             className="mb-3"
                         ),
                         html.Hr(),
+                        dbc.Label("Status information:"),
                         dbc.Card([
                             dbc.CardBody([
                                 html.P([dbc.Badge("Last update:", color="secondary", className="me-2"), 
@@ -237,11 +238,11 @@ app.layout = html.Div([
                         ])
                     ]),
                     dbc.Tab(label="Main View", tab_id="main", children=[
-                        dcc.Graph(id="map-plot", style={"height": "45vh"}),
-                        dcc.Graph(id="timeseries-plot", style={"height": "45vh"})
+                        dcc.Graph(id="map-plot", style={"height": "80vh", "minHeight": "300px"}),
+                        dcc.Graph(id="timeseries-plot")
                     ]),
                     dbc.Tab(label="All Fields", tab_id="all-fields", children=[
-                        dcc.Graph(id="all-fields-timeseries-plot", style={"height": "80vh"})
+                        dcc.Graph(id="all-fields-timeseries-plot")
                     ]),
                     dbc.Tab(label="Correlation", tab_id="correlation", children=[
                         dbc.Row([
