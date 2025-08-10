@@ -190,8 +190,14 @@ app.layout = html.Div([
                             dbc.CardBody([
                                 html.P([dbc.Badge("Last update:", color="secondary", className="me-2"), 
                                        html.Span(id="last-update-display")]),
+                                html.P([dbc.Badge("Last timestamp:", color="secondary", className="me-2"), 
+                                       html.Span(id="most-recent-timestamp-display")]),
                                 html.P([dbc.Badge("Total rows:", color="info", className="me-2"), 
-                                       html.Span(id="total-rows-display")]),
+                                       html.Span(id="total-rows-all-data")]),
+                                html.P([dbc.Badge("Rows with missing data:", color="info", className="me-2"), 
+                                       html.Span(id="missing-rows-all-data")]),
+                                html.P([dbc.Badge("Filtered/resampled rows:", color="info", className="me-2"), 
+                                       html.Span(id="total-rows-filtered")]),
                             ])
                         ], color="light", outline=True)
                     ])
@@ -437,29 +443,68 @@ def update_correlation_plots(toggle, n_intervals, x_col, y_col, resample_freq,
     [Output("ph-value", "children"),
      Output("rho-value", "children"),
      Output("last-update-display", "children"),
-     Output("total-rows-display", "children")],
-    Input("interval-component", "n_intervals")
+     Output("most-recent-timestamp-display", "children"),
+     Output("total-rows-all-data", "children"),
+     Output("total-rows-filtered", "children"),
+     Output("missing-rows-all-data", "children")],
+    [Input("interval-component", "n_intervals"),
+     Input("time-range-mode", "value"),
+     Input("resample-dropdown", "value"),
+     Input("auto-update-toggle", "value")]
 )
-def update_status_info(n_intervals):
-    """Update status information"""
+def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update):
+    """Update status information including comprehensive statistics"""
     ph_val = "No Data"
     rho_val = "No Data"
     
     if not data_manager.data.empty:
+        # pH value from latest data
         if "ph_corrected_ma" in data_manager.data.columns:
             latest_ph = data_manager.data["ph_corrected_ma"].dropna()
             if not latest_ph.empty:
                 ph_val = f"{latest_ph.iloc[-1]:.2f}"
         
+        # Rho value from latest data
         if "rho_ppb" in data_manager.data.columns:
             latest_rho = data_manager.data["rho_ppb"].dropna()
             if not latest_rho.empty:
                 rho_val = f"{latest_rho.iloc[-1]:.1f}"
     
+    # Current time for last update
     current_time = datetime.now().strftime("%H:%M:%S")
-    total_rows = len(data_manager.data)
     
-    return ph_val, rho_val, current_time, str(total_rows)
+    # Most recent timestamp from data
+    most_recent_timestamp = (
+        data_manager.data["datetime_utc"].max() if not data_manager.data.empty else None
+    )
+    most_recent_timestamp_display = (
+        pd.to_datetime(most_recent_timestamp).strftime("%Y-%m-%d %H:%M:%S") 
+        if most_recent_timestamp else "N/A"
+    )
+    
+    # Total rows in all data
+    total_rows_all_data = len(data_manager.data)
+    
+    # Calculate missing rows (rows with any missing data)
+    missing_rows_all_data = data_manager.data.isnull().any(axis=1).sum()
+    
+    # Get filtered data count (using same logic as get_filtered_data)
+    try:
+        filtered_data = get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals)
+        total_rows_filtered = len(filtered_data)
+    except Exception as e:
+        logger.error(f"Error getting filtered data count: {e}")
+        total_rows_filtered = 0
+    
+    return (
+        ph_val, 
+        rho_val, 
+        current_time,
+        most_recent_timestamp_display,
+        str(total_rows_all_data),
+        str(total_rows_filtered),
+        str(missing_rows_all_data)
+    )
 
 # Background update thread
 def background_update():
