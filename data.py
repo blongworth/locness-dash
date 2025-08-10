@@ -111,10 +111,77 @@ class DataManager:
         return df
 
     def _query_dynamodb_data(self, start_time=None, limit=None):
-        """Query data from DynamoDB using datetime_utc as partition key"""
+        """Query data from DynamoDB using partition key 'data' and sort key 'datetime_utc'"""
+        try:
+            # First try efficient query approach (requires partition + sort key schema)
+            return self._query_dynamodb_with_keys(start_time, limit)
+        except Exception as e:
+            # Check if it's a ValidationException indicating schema mismatch
+            if "ValidationException" in str(e) or "sort key" in str(e).lower():
+                logger.warning(f"DynamoDB: Query with keys failed ({e}), falling back to scan operations")
+                return self._scan_dynamodb_fallback(start_time, limit)
+            else:
+                # Re-raise other exceptions
+                raise
+
+    def _query_dynamodb_with_keys(self, start_time=None, limit=None):
+        """Efficient query using partition key 'data' and sort key 'datetime_utc'"""
+        if start_time:
+            # Convert pandas datetime to ISO string for DynamoDB query
+            if hasattr(start_time, 'isoformat'):
+                start_time_iso = start_time.isoformat()
+            else:
+                start_time_iso = pd.to_datetime(start_time).isoformat()
+            
+            # Add 'Z' suffix if not present for proper UTC comparison
+            if not start_time_iso.endswith('Z') and '+' not in start_time_iso:
+                start_time_iso = start_time_iso + 'Z'
+            
+            logger.debug(f"DynamoDB: Querying partition 'data' for datetime_utc > {start_time_iso}")
+            
+            # Use efficient query with partition key and sort key condition
+            response = self.table.query(
+                KeyConditionExpression=Key('partition').eq('data') & Key('datetime_utc').gt(start_time_iso),
+                Limit=limit if limit else 1000,
+                ScanIndexForward=True  # Sort ascending by datetime_utc
+            )
+        else:
+            # Query entire partition for initial load
+            logger.debug("DynamoDB: Querying entire 'data' partition")
+            response = self.table.query(
+                KeyConditionExpression=Key('partition').eq('data'),
+                Limit=limit if limit else 1000,
+                ScanIndexForward=True  # Sort ascending by datetime_utc
+            )
+        
+        items = response['Items']
+        
+        # Handle pagination
+        while 'LastEvaluatedKey' in response and len(items) < (limit or 10000):
+            if start_time:
+                response = self.table.query(
+                    KeyConditionExpression=Key('partition').eq('data') & Key('datetime_utc').gt(start_time_iso),
+                    ExclusiveStartKey=response['LastEvaluatedKey'],
+                    Limit=(limit - len(items)) if limit else 1000,
+                    ScanIndexForward=True
+                )
+            else:
+                response = self.table.query(
+                    KeyConditionExpression=Key('partition').eq('data'),
+                    ExclusiveStartKey=response['LastEvaluatedKey'],
+                    Limit=(limit - len(items)) if limit else 1000,
+                    ScanIndexForward=True
+                )
+            items.extend(response['Items'])
+            
+        logger.debug(f"DynamoDB: Retrieved {len(items)} total items from query")
+        return self._process_dynamodb_items(items, start_time)
+
+    def _scan_dynamodb_fallback(self, start_time=None, limit=None):
+        """Fallback scan operation for tables without expected key schema"""
         try:
             if start_time:
-                # Convert pandas datetime to ISO string for DynamoDB query
+                # Convert pandas datetime to ISO string for DynamoDB filter
                 if hasattr(start_time, 'isoformat'):
                     start_time_iso = start_time.isoformat()
                 else:
@@ -126,7 +193,7 @@ class DataManager:
                 
                 logger.debug(f"DynamoDB: Scanning for datetime_utc > {start_time_iso}")
                 
-                # Use scan with filter for datetime_utc as partition key
+                # Use scan with filter for datetime_utc
                 response = self.table.scan(
                     FilterExpression=Key('datetime_utc').gt(start_time_iso),
                     Limit=limit if limit else 1000
@@ -153,36 +220,41 @@ class DataManager:
                     )
                 items.extend(response['Items'])
                 
-            logger.debug(f"DynamoDB: Retrieved {len(items)} total items")
-                
-            df = pd.DataFrame(items)
-            df = self._convert_dynamodb_timestamps(df)
-            
-            # Convert all DynamoDB data types to proper pandas dtypes
-            if not df.empty:
-                df = self._ensure_proper_dtypes(df)
-            
-            # Additional client-side filtering for precise timestamp filtering
-            if start_time and not df.empty:
-                initial_count = len(df)
-                df = df[df["datetime_utc"] > start_time]
-                logger.debug(f"DynamoDB: After timestamp filtering, {len(df)} of {initial_count} rows remain")
-            
-            # Sort by datetime_utc before returning
-            if not df.empty and "datetime_utc" in df.columns:
-                df = df.sort_values("datetime_utc").reset_index(drop=True)
-                logger.debug(f"DynamoDB: Sorted {len(df)} rows by datetime_utc")
-                
-                # Debug: Print column data types for troubleshooting dropdown issues
-                logger.debug("DynamoDB: Final column data types:")
-                for col, dtype in df.dtypes.items():
-                    logger.debug(f"  {col}: {dtype}")
-            
-            return df
+            logger.debug(f"DynamoDB: Retrieved {len(items)} total items from scan")
+            return self._process_dynamodb_items(items, start_time)
             
         except Exception as e:
-            logger.error(f"Error querying DynamoDB: {e}", exc_info=True)
+            logger.error(f"Error scanning DynamoDB: {e}", exc_info=True)
             return pd.DataFrame()
+
+    def _process_dynamodb_items(self, items, start_time=None):
+        """Common processing for DynamoDB items regardless of query/scan method"""
+        df = pd.DataFrame(items)
+        df = self._convert_dynamodb_timestamps(df)
+        
+        # Convert all DynamoDB data types to proper pandas dtypes
+        if not df.empty:
+            df = self._ensure_proper_dtypes(df)
+        
+        # Additional client-side filtering for precise timestamp filtering if needed
+        # (Should not be necessary with efficient query, but kept for safety)
+        if start_time and not df.empty:
+            initial_count = len(df)
+            df = df[df["datetime_utc"] > start_time]
+            if initial_count != len(df):
+                logger.debug(f"DynamoDB: Client-side timestamp filtering removed {initial_count - len(df)} items")
+        
+        # Data should already be sorted by datetime_utc from DynamoDB query, but ensure it
+        if not df.empty and "datetime_utc" in df.columns:
+            df = df.sort_values("datetime_utc").reset_index(drop=True)
+            logger.debug(f"DynamoDB: Final sorted data has {len(df)} rows")
+            
+            # Debug: Print column data types for troubleshooting dropdown issues
+            logger.debug("DynamoDB: Final column data types:")
+            for col, dtype in df.dtypes.items():
+                logger.debug(f"  {col}: {dtype}")
+        
+        return df
 
     def load_initial_data(self):
         """Load all existing data from the data source"""
