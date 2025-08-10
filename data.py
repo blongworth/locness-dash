@@ -211,6 +211,9 @@ class DataManager:
                 if not self.data.empty:
                     # Set timestamp column (same as datetime_utc for consistency)
                     self.last_datetime_utc = self.data["datetime_utc"].max()
+                    
+                    # Remove duplicates after loading initial data
+                    self._remove_duplicates_internal()
 
             except Exception as e:
                 logger.error(f"Error loading initial data: {e}", exc_info=True)
@@ -259,6 +262,9 @@ class DataManager:
                     self.data = pd.concat([self.data, new_data], ignore_index=True)
                     # Update last_datetime_utc to the maximum datetime in the new data
                     self.last_datetime_utc = new_data["datetime_utc"].max()
+                    
+                    # Remove duplicates after adding new data
+                    self._remove_duplicates_internal()
 
                 logger.debug(f"DataManager: data shape after append: {self.data.shape}")
                 logger.debug(f"DataManager: last_datetime_utc updated to {self.last_datetime_utc}")
@@ -387,18 +393,22 @@ class DataManager:
             if col in df.columns:
                 self.data[col] = df[col]
 
+    def _remove_duplicates_internal(self):
+        """Internal method to remove duplicates without acquiring lock (assumes caller holds lock)"""
+        if not self.data.empty and "datetime_utc" in self.data.columns:
+            initial_count = len(self.data)
+            self.data = self.data.drop_duplicates(subset=['datetime_utc'], keep='last')
+            final_count = len(self.data)
+            if initial_count != final_count:
+                logger.warning(f"DataManager: Removed {initial_count - final_count} duplicate rows")
+                # Update last_datetime_utc after deduplication
+                if not self.data.empty:
+                    self.last_datetime_utc = self.data["datetime_utc"].max()
+
     def remove_duplicates(self):
         """Remove duplicate rows based on datetime_utc, keeping the last occurrence"""
         with self.lock:
-            if not self.data.empty and "datetime_utc" in self.data.columns:
-                initial_count = len(self.data)
-                self.data = self.data.drop_duplicates(subset=['datetime_utc'], keep='last')
-                final_count = len(self.data)
-                if initial_count != final_count:
-                    logger.warning(f"DataManager: Removed {initial_count - final_count} duplicate rows")
-                    # Update last_datetime_utc after deduplication
-                    if not self.data.empty:
-                        self.last_datetime_utc = self.data["datetime_utc"].max()
+            self._remove_duplicates_internal()
 
     def get_data_info(self):
         """Get information about the current data for debugging"""
