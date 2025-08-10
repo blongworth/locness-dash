@@ -42,16 +42,24 @@ class DataManager:
             # Convert numeric columns from DynamoDB Decimal/string types to proper numeric types
             # DynamoDB often stores numbers as Decimal objects or strings which need conversion
             for col in data.columns:
-                if col != "datetime_utc":
-                    # First try to convert from Decimal objects to float
-                    if data[col].dtype == 'object':
-                        # Check if column contains Decimal objects
-                        sample_vals = data[col].dropna().head()
-                        if len(sample_vals) > 0 and isinstance(sample_vals.iloc[0], Decimal):
-                            data[col] = data[col].apply(lambda x: float(x) if isinstance(x, Decimal) else x)
+                if col in ["datetime_utc", "static_partition", "partition"]:
+                    # Skip datetime and partition columns
+                    continue
                     
-                    # Then convert to numeric types, keeping non-numeric as-is
+                # First try to convert from Decimal objects to float
+                if data[col].dtype == 'object':
+                    # Check if column contains Decimal objects
+                    sample_vals = data[col].dropna().head()
+                    if len(sample_vals) > 0 and isinstance(sample_vals.iloc[0], Decimal):
+                        data[col] = data[col].apply(lambda x: float(x) if isinstance(x, Decimal) else x)
+                
+                # Then convert to numeric types, keeping non-numeric as-is
+                # Use try/catch to skip non-numeric columns like partition keys
+                try:
                     data[col] = pd.to_numeric(data[col])
+                except (ValueError, TypeError):
+                    # Keep as original type if conversion fails
+                    pass
                     
         return data
 
@@ -65,6 +73,12 @@ class DataManager:
                 if not pd.api.types.is_datetime64_any_dtype(df[col]):
                     df[col] = pd.to_datetime(df[col])
                     logger.debug(f"  {col}: converted to datetime64[ns]")
+                continue
+            
+            if col in ["static_partition", "partition"]:
+                # Skip partition columns - keep as string
+                df[col] = df[col].astype('string')
+                logger.debug(f"  {col}: kept as string (partition column)")
                 continue
                 
             # Handle other columns
@@ -141,7 +155,7 @@ class DataManager:
             
             # Use efficient query with partition key and sort key condition
             response = self.table.query(
-                KeyConditionExpression=Key('partition').eq('data') & Key('datetime_utc').gt(start_time_iso),
+                KeyConditionExpression=Key('static_partition').eq('data') & Key('datetime_utc').gt(start_time_iso),
                 Limit=limit if limit else 1000,
                 ScanIndexForward=True  # Sort ascending by datetime_utc
             )
@@ -149,7 +163,7 @@ class DataManager:
             # Query entire partition for initial load
             logger.debug("DynamoDB: Querying entire 'data' partition")
             response = self.table.query(
-                KeyConditionExpression=Key('partition').eq('data'),
+                KeyConditionExpression=Key('static_partition').eq('data'),
                 Limit=limit if limit else 1000,
                 ScanIndexForward=True  # Sort ascending by datetime_utc
             )
@@ -160,14 +174,14 @@ class DataManager:
         while 'LastEvaluatedKey' in response and len(items) < (limit or 10000):
             if start_time:
                 response = self.table.query(
-                    KeyConditionExpression=Key('partition').eq('data') & Key('datetime_utc').gt(start_time_iso),
+                    KeyConditionExpression=Key('static_partition').eq('data') & Key('datetime_utc').gt(start_time_iso),
                     ExclusiveStartKey=response['LastEvaluatedKey'],
                     Limit=(limit - len(items)) if limit else 1000,
                     ScanIndexForward=True
                 )
             else:
                 response = self.table.query(
-                    KeyConditionExpression=Key('partition').eq('data'),
+                    KeyConditionExpression=Key('static_partition').eq('data'),
                     ExclusiveStartKey=response['LastEvaluatedKey'],
                     Limit=(limit - len(items)) if limit else 1000,
                     ScanIndexForward=True
@@ -389,9 +403,12 @@ class DataManager:
             data = data[data["datetime_utc"] <= end_time]
             logger.debug(f"DataManager.get_data: After end_time filter: {data.shape}")
 
-        # Remove 'partition' column if it exists
-        if "partition" in data.columns:
-            data = data.drop(columns=["partition"])
+        # Remove partition columns if they exist
+        partition_columns = ["partition", "static_partition"]
+        for col in partition_columns:
+            if col in data.columns:
+                data = data.drop(columns=[col])
+                logger.debug(f"DataManager.get_data: Removed partition column '{col}'")
 
         # Resample if requested (downsampling only - never upsample)
         if resample_freq and not data.empty:
@@ -428,7 +445,21 @@ class DataManager:
                     if requested_seconds > median_seconds:
                         logger.debug(f"DataManager.get_data: Downsampling from {median_seconds:.1f}s to {requested_seconds}s")
                         data.set_index("datetime_utc", inplace=True)
-                        resampled_data = data.resample(resample_freq).mean()
+                        
+                        # Separate numeric and non-numeric columns for resampling
+                        numeric_columns = data.select_dtypes(include=['number']).columns
+                        non_numeric_columns = data.select_dtypes(exclude=['number']).columns
+                        
+                        # Resample only numeric columns with mean
+                        resampled_numeric = data[numeric_columns].resample(resample_freq).mean()
+                        
+                        # For non-numeric columns, take the first value in each group
+                        if len(non_numeric_columns) > 0:
+                            resampled_non_numeric = data[non_numeric_columns].resample(resample_freq).first()
+                            resampled_data = pd.concat([resampled_numeric, resampled_non_numeric], axis=1)
+                        else:
+                            resampled_data = resampled_numeric
+                        
                         resampled_data.reset_index(inplace=True)
                         data = resampled_data
                         logger.debug(f"DataManager.get_data: After resampling shape: {data.shape}")
