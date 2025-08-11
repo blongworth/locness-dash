@@ -62,34 +62,6 @@ app = dash.Dash(
 )
 server = app.server
 
-# Add custom CSS for blinking animation
-app.index_string = '''
-<!DOCTYPE html>
-<html>
-    <head>
-        {%metas%}
-        <title>{%title%}</title>
-        {%favicon%}
-        {%css%}
-        <style>
-            @keyframes blink {
-                0% { opacity: 1; }
-                50% { opacity: 0.3; }
-                100% { opacity: 1; }
-            }
-        </style>
-    </head>
-    <body>
-        {%app_entry%}
-        <footer>
-            {%config%}
-            {%scripts%}
-            {%renderer%}
-        </footer>
-    </body>
-</html>
-'''
-
 # Shared data store for filtered data to avoid redundant processing
 filtered_data_store = {"data": pd.DataFrame(), "last_update": 0, "params": {}}
 
@@ -497,13 +469,14 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
                 ph_val = f"{ph_value:.2f}"
                 
                 # Add threshold-based coloring and animation
-                if ph_value > 10:  # Critical threshold - flashing red
+                if ph_value > 10:  # Critical threshold - red, bold, and bright
                     ph_style = {
                         "fontSize": "2.5rem", 
                         "color": "red",
-                        "animation": "blink 1s infinite"
+                        "fontWeight": "bold",
+                        "filter": "brightness(1.5)"
                     }
-                elif ph_value > 8.7:  # Warning threshold - solid red
+                elif ph_value > 8.7:  # Warning threshold - red only
                     ph_style = {"fontSize": "2.5rem", "color": "red"}
                 else:  # Normal range - default color
                     ph_style = {"fontSize": "2.5rem"}
