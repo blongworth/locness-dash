@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>pH Indicator Style Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            padding: 20px;
+        }
+        .ph-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 10px;
+            text-align: center;
+            display: inline-block;
+            width: 200px;
+        }
+        .normal {
+            font-size: 2.5rem;
+        }
+        .warning {
+            font-size: 2.5rem;
+            color: red;
+        }
+        .critical {
+            font-size: 2.5rem;
+            color: red;
+            font-weight: bold;
+            filter: brightness(1.5);
+        }
+    </style>
+</head>
+<body>
+    <h1>pH Indicator Visual Test</h1>
+    
+    <div class="ph-card">
+        <h3>Normal pH</h3>
+        <div class="normal">8.1</div>
+        <p>Default styling</p>
+    </div>
+    
+    <div class="ph-card">
+        <h3>Warning pH</h3>
+        <div class="warning">8.9</div>
+        <p>Red only (not bold)</p>
+    </div>
+    
+    <div class="ph-card">
+        <h3>Critical pH</h3>
+        <div class="critical">10.5</div>
+        <p>Red, bold, and bright</p>
+    </div>
+    
+    <h2>Test Results:</h2>
+    <ul>
+        <li>✅ No custom CSS keyframes needed</li>
+        <li>✅ Uses standard CSS properties (filter, fontWeight)</li>
+        <li>✅ Critical values (>10): red, bold, and bright</li>
+        <li>✅ Warning values (>8.7): red only (not bold)</li>
+        <li>✅ Normal values remain readable</li>
+        <li>✅ No glowing shadow effects</li>
+    </ul>
+</body>
+</html>

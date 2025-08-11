@@ -499,6 +499,7 @@ def update_correlation_plots(toggle, n_intervals, x_col, y_col, resample_freq,
 
 @callback(
     [Output("ph-value", "children"),
+     Output("ph-value", "style"),
      Output("rho-value", "children"),
      Output("last-update-display", "children"),
      Output("most-recent-timestamp-display", "children"),
@@ -521,6 +522,7 @@ def update_correlation_plots(toggle, n_intervals, x_col, y_col, resample_freq,
 def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update):
     """Update status information including comprehensive statistics"""
     ph_val = "No Data"
+    ph_style = {"fontSize": "2.5rem"}  # Default style
     rho_val = "No Data"
     
     if not data_manager.data.empty:
@@ -528,7 +530,21 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
         if "ph_corrected_ma" in data_manager.data.columns:
             latest_ph = data_manager.data["ph_corrected_ma"].dropna()
             if not latest_ph.empty:
-                ph_val = f"{latest_ph.iloc[-1]:.2f}"
+                ph_value = latest_ph.iloc[-1]
+                ph_val = f"{ph_value:.2f}"
+                
+                # Add threshold-based coloring and animation
+                if ph_value > 10:  # Critical threshold - red, bold, and bright
+                    ph_style = {
+                        "fontSize": "2.5rem", 
+                        "color": "red",
+                        "fontWeight": "bold",
+                        "filter": "brightness(1.5)"
+                    }
+                elif ph_value > 8.7:  # Warning threshold - red only
+                    ph_style = {"fontSize": "2.5rem", "color": "red"}
+                else:  # Normal range - default color
+                    ph_style = {"fontSize": "2.5rem"}
         
         # Rho value from latest data
         if "rho_ppb" in data_manager.data.columns:
@@ -574,6 +590,7 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
     if data_manager.spot_api:
         return (
             ph_val, 
+            ph_style,
             rho_val, 
             current_time,
             most_recent_timestamp_display,
@@ -585,6 +602,7 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
     else:
         return (
             ph_val, 
+            ph_style,
             rho_val, 
             current_time,
             most_recent_timestamp_display,
