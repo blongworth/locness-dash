@@ -165,6 +165,14 @@ app.layout = html.Div([
                             value="rho_ppb",
                             className="mb-3"
                         ),
+                        dbc.Switch(
+                            id="show-drifters-toggle",
+                            label="Show Drifters",
+                            value=False,
+                            className="mb-2",
+                            persistence=True,
+                            persistence_type="session"
+                        ) if data_manager.spot_api else html.Div(),
                         dbc.Label("Resample Interval:"),
                         dcc.Dropdown(
                             id="resample-dropdown",
@@ -187,14 +195,6 @@ app.layout = html.Div([
                             persistence=True,
                             persistence_type="session"
                         ),
-                        dbc.Switch(
-                            id="show-drifters-toggle",
-                            label="Show Drifters",
-                            value=False,
-                            className="mb-2",
-                            persistence=True,
-                            persistence_type="session"
-                        ) if data_manager.spot_api else html.Div(),
                         dbc.Label("Time Range:"),
                         dcc.Slider(
                             id="time-range-mode",
