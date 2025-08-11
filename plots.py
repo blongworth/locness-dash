@@ -148,10 +148,12 @@ def create_dispersal_plot(data, template="bootstrap"):
     return dispersal_fig
 
 
-def create_map_plot(df, field, template="bootstrap", style=None):
+def create_map_plot(df, field, template="bootstrap", style=None, drifter_data=None, show_drifters=False):
     """
-    Create a map plot with optional style.
+    Create a map plot with optional style and drifter traces.
     style: 'dark' (default) or 'bathymetry'.
+    drifter_data: DataFrame with drifter position data
+    show_drifters: bool to control drifter visibility
     """
     if df.empty:
         return go.Figure()
@@ -300,6 +302,64 @@ def create_map_plot(df, field, template="bootstrap", style=None):
                     hovertemplate="<br>".join(hover_parts) + "<extra></extra>",
                 )
             )
+
+    # Add drifter traces if available and enabled
+    if show_drifters and drifter_data is not None and not drifter_data.empty:
+        # Get unique drifter IDs
+        unique_drifters = drifter_data['drifter_id'].unique() if 'drifter_id' in drifter_data.columns else ['unknown']
+        
+        # Color palette for different drifters
+        drifter_colors = ['orange', 'purple', 'green', 'yellow', 'cyan', 'magenta']
+        
+        for i, drifter_id in enumerate(unique_drifters):
+            if 'drifter_id' in drifter_data.columns:
+                drifter_positions = drifter_data[drifter_data['drifter_id'] == drifter_id]
+            else:
+                drifter_positions = drifter_data
+            
+            if drifter_positions.empty:
+                continue
+                
+            color = drifter_colors[i % len(drifter_colors)]
+            
+            # Add drifter track
+            fig.add_trace(
+                go.Scattermap(
+                    lat=drifter_positions["latitude"],
+                    lon=drifter_positions["longitude"],
+                    mode="lines+markers",
+                    line=dict(width=2, color=color),
+                    marker=dict(size=6, color=color),
+                    name=f"Drifter {drifter_id}",
+                    hovertemplate=(
+                        f"<b>Drifter {drifter_id}</b><br>"
+                        "Timestamp: %{customdata[0]}<br>"
+                        "Lat: %{lat:.4f}          Lon: %{lon:.4f}<br>"
+                        "<extra></extra>"
+                    ),
+                    customdata=[[dt.strftime('%Y-%m-%d %H:%M:%S')] for dt in drifter_positions["datetime_utc"]],
+                )
+            )
+            
+            # Add current drifter position marker
+            if not drifter_positions.empty:
+                latest_drifter = drifter_positions.iloc[-1]
+                fig.add_trace(
+                    go.Scattermap(
+                        lat=[latest_drifter["latitude"]],
+                        lon=[latest_drifter["longitude"]],
+                        mode="markers",
+                        marker=dict(size=12, color=color, symbol="diamond"),
+                        name=f"Drifter {drifter_id} (current)",
+                        hovertemplate=(
+                            f"<b>Drifter {drifter_id} - Current Position</b><br>"
+                            f"Timestamp: {latest_drifter['datetime_utc'].strftime('%Y-%m-%d %H:%M:%S')}<br>"
+                            f"Lat: {latest_drifter['latitude']:.4f}          Lon: {latest_drifter['longitude']:.4f}<br>"
+                            "<extra></extra>"
+                        ),
+                        showlegend=False,  # Don't show in legend to avoid duplication
+                    )
+                )
 
     fig.update_layout(
         template=template,

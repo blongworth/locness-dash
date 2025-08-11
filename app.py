@@ -37,13 +37,25 @@ try:
         data_manager = DataManager(
             data_path=config.get("data_path"),
             dynamodb_table=config["dynamodb_table"],
-            dynamodb_region=config.get("dynamodb_region", "us-east-1")
+            dynamodb_region=config.get("dynamodb_region", "us-east-1"),
+            spot_feed_id=config.get("spot_feed_id"),
+            drifter_update_interval=config.get("drifter_update_interval", 300)
         )
     else:
         logger.info("Initializing DataManager with data_path '%s'", config.get("data_path"))
-        data_manager = DataManager(config["data_path"])
+        data_manager = DataManager(
+            config["data_path"],
+            spot_feed_id=config.get("spot_feed_id"),
+            drifter_update_interval=config.get("drifter_update_interval", 300)
+        )
     data_manager.load_initial_data()
     logger.info("Initial data loaded successfully.")
+    
+    # Load initial drifter data if available
+    if data_manager.spot_api:
+        data_manager.update_drifter_data(force_update=True)
+        logger.info("Initial drifter data loaded successfully.")
+    
 except Exception as e:
     logger.error("Failed to initialize DataManager: %s", e, exc_info=True)
     raise
@@ -175,6 +187,14 @@ app.layout = html.Div([
                             persistence=True,
                             persistence_type="session"
                         ),
+                        dbc.Switch(
+                            id="show-drifters-toggle",
+                            label="Show Drifters",
+                            value=False,
+                            className="mb-2",
+                            persistence=True,
+                            persistence_type="session"
+                        ) if data_manager.spot_api else html.Div(),
                         dbc.Label("Time Range:"),
                         dcc.Slider(
                             id="time-range-mode",
@@ -199,6 +219,8 @@ app.layout = html.Div([
                                        html.Span(id="missing-rows-all-data")]),
                                 html.P([dbc.Badge("Filtered/resampled rows:", color="info", className="me-2"), 
                                        html.Span(id="total-rows-filtered")]),
+                                html.P([dbc.Badge("Drifter positions:", color="warning", className="me-2"), 
+                                       html.Span(id="drifter-status-display")]) if data_manager.spot_api else html.Div(),
                             ])
                         ], color="light", outline=True)
                     ])
@@ -339,10 +361,18 @@ def auto_adjust_resample(time_range_mode, current_resample):
      Input("map-field-dropdown", "value"),
      Input("resample-dropdown", "value"),
      Input("time-range-mode", "value"),
+     Input("auto-update-toggle", "value"),
+     Input("show-drifters-toggle", "value")] if data_manager.spot_api else
+    [Input(ThemeSwitchAIO.ids.switch("theme"), "value"),
+     Input("interval-component", "n_intervals"),
+     Input("timeseries-fields-dropdown", "value"),
+     Input("map-field-dropdown", "value"),
+     Input("resample-dropdown", "value"),
+     Input("time-range-mode", "value"),
      Input("auto-update-toggle", "value")]
 )
 def update_main_plots(toggle, n_intervals, ts_fields, map_field, resample_freq, 
-                     time_range_mode, auto_update):
+                     time_range_mode, auto_update, show_drifters=False):
     """Main plots callback - simplified and optimized"""
     template = light_theme if toggle else dark_theme
     
@@ -353,9 +383,19 @@ def update_main_plots(toggle, n_intervals, ts_fields, map_field, resample_freq,
         empty_fig = {"data": [], "layout": {"template": template}}
         return empty_fig, empty_fig, empty_fig
     
+    # Get drifter data if enabled
+    drifter_data = None
+    if show_drifters and data_manager.spot_api:
+        # Get drifter data for the same time range as the main data
+        if not data.empty:
+            start_time = data["datetime_utc"].min()
+            end_time = data["datetime_utc"].max()
+            drifter_data = data_manager.get_drifter_data(start_time=start_time, end_time=end_time)
+    
     # Create plots
     ts_fig = create_timeseries_plot(data, ts_fields or [], template=template)
-    map_fig = create_map_plot(data, map_field, template=template)
+    map_fig = create_map_plot(data, map_field, template=template, 
+                             drifter_data=drifter_data, show_drifters=show_drifters)
     
     # All fields plot
     exclude = ["datetime_utc", "index", "id", "partition"]
@@ -379,10 +419,17 @@ def update_main_plots(toggle, n_intervals, ts_fields, map_field, resample_freq,
      Input("map-field-dropdown", "value"),
      Input("resample-dropdown", "value"),
      Input("time-range-mode", "value"),
+     Input("auto-update-toggle", "value"),
+     Input("show-drifters-toggle", "value")] if data_manager.spot_api else
+    [Input(ThemeSwitchAIO.ids.switch("theme"), "value"),
+     Input("interval-component", "n_intervals"),
+     Input("map-field-dropdown", "value"),
+     Input("resample-dropdown", "value"),
+     Input("time-range-mode", "value"),
      Input("auto-update-toggle", "value")]
 )
 def update_dispersal_plots(toggle, n_intervals, map_field, resample_freq, 
-                          time_range_mode, auto_update):
+                          time_range_mode, auto_update, show_drifters=False):
     """Dispersal view plots"""
     template = light_theme if toggle else dark_theme
     
@@ -392,8 +439,18 @@ def update_dispersal_plots(toggle, n_intervals, map_field, resample_freq,
         empty_fig = {"data": [], "layout": {"template": template}}
         return empty_fig, empty_fig
     
+    # Get drifter data if enabled
+    drifter_data = None
+    if show_drifters and data_manager.spot_api:
+        # Get drifter data for the same time range as the main data
+        if not data.empty:
+            start_time = data["datetime_utc"].min()
+            end_time = data["datetime_utc"].max()
+            drifter_data = data_manager.get_drifter_data(start_time=start_time, end_time=end_time)
+    
     dispersal_fig = create_dispersal_plot(data, template=template)
-    map_fig = create_map_plot(data, map_field, template=template)
+    map_fig = create_map_plot(data, map_field, template=template,
+                             drifter_data=drifter_data, show_drifters=show_drifters)
     
     uirevision = f"dispersal-{len(data)}" if auto_update else "dispersal-constant"
     
@@ -441,6 +498,14 @@ def update_correlation_plots(toggle, n_intervals, x_col, y_col, resample_freq,
     return corr_fig, ba_fig
 
 @callback(
+    [Output("ph-value", "children"),
+     Output("rho-value", "children"),
+     Output("last-update-display", "children"),
+     Output("most-recent-timestamp-display", "children"),
+     Output("total-rows-all-data", "children"),
+     Output("total-rows-filtered", "children"),
+     Output("missing-rows-all-data", "children"),
+     Output("drifter-status-display", "children")] if data_manager.spot_api else
     [Output("ph-value", "children"),
      Output("rho-value", "children"),
      Output("last-update-display", "children"),
@@ -497,15 +562,36 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
         logger.error(f"Error getting filtered data count: {e}")
         total_rows_filtered = 0
     
-    return (
-        ph_val, 
-        rho_val, 
-        current_time,
-        most_recent_timestamp_display,
-        str(total_rows_all_data),
-        str(total_rows_filtered),
-        str(missing_rows_all_data)
-    )
+    # Drifter status
+    drifter_status = "N/A"
+    if data_manager.spot_api:
+        drifter_info = data_manager.get_drifter_info()
+        if drifter_info["status"] == "Active":
+            drifter_status = f"{drifter_info['total_positions']} positions"
+        else:
+            drifter_status = "No data"
+    
+    if data_manager.spot_api:
+        return (
+            ph_val, 
+            rho_val, 
+            current_time,
+            most_recent_timestamp_display,
+            str(total_rows_all_data),
+            str(total_rows_filtered),
+            str(missing_rows_all_data),
+            drifter_status
+        )
+    else:
+        return (
+            ph_val, 
+            rho_val, 
+            current_time,
+            most_recent_timestamp_display,
+            str(total_rows_all_data),
+            str(total_rows_filtered),
+            str(missing_rows_all_data)
+        )
 
 # Background update thread
 def background_update():
@@ -518,6 +604,11 @@ def background_update():
                 # Clear cache when new data arrives
                 global filtered_data_store
                 filtered_data_store = {"data": pd.DataFrame(), "last_update": 0, "params": {}}
+            
+            # Update drifter data periodically
+            if data_manager.spot_api:
+                data_manager.update_drifter_data()
+                
         except Exception as e:
             logger.warning("Error during background update: %s", e)
 

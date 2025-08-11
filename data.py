@@ -5,12 +5,22 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal
 import logging
+import os
 
 # Use the same logger name as in app.py for consistency
 logger = logging.getLogger("locness_dash.data")
 
+try:
+    from drifterdata.spot_tracker import SpotTrackerAPI
+    DRIFTER_DATA_AVAILABLE = True
+except ImportError:
+    logger.warning("drifterdata package not available - drifter functionality disabled")
+    DRIFTER_DATA_AVAILABLE = False
+    SpotTrackerAPI = None
+
 class DataManager:
-    def __init__(self, data_path, dynamodb_table=None, dynamodb_region='us-east-1'):
+    def __init__(self, data_path, dynamodb_table=None, dynamodb_region='us-east-1', 
+                 spot_feed_id=None, drifter_update_interval=300):
         self.data_path = data_path
         self.dynamodb_table = dynamodb_table
         self.dynamodb_region = dynamodb_region
@@ -19,6 +29,24 @@ class DataManager:
         self.lock = threading.Lock()
         self.is_parquet = data_path.endswith(".parquet") if data_path else False
         self.is_dynamodb = dynamodb_table is not None
+        
+        # Drifter data management
+        self.spot_feed_id = spot_feed_id or os.getenv('SPOT_FEED_ID')
+        self.drifter_update_interval = drifter_update_interval
+        self.drifter_data = pd.DataFrame()
+        self.last_drifter_update = None
+        self.spot_api = None
+        
+        # Initialize SPOT API if available and configured
+        if DRIFTER_DATA_AVAILABLE and self.spot_feed_id and SpotTrackerAPI:
+            try:
+                self.spot_api = SpotTrackerAPI(feed_id=self.spot_feed_id)
+                logger.info(f"SPOT Tracker API initialized with feed ID: {self.spot_feed_id}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize SPOT Tracker API: {e}")
+                self.spot_api = None
+        elif self.spot_feed_id:
+            logger.warning("SPOT feed ID provided but drifterdata package not available")
         
         # Initialize DynamoDB resource if needed
         if self.is_dynamodb:
@@ -533,5 +561,117 @@ class DataManager:
         if "datetime_utc" in data.columns:
             duplicate_count = data['datetime_utc'].duplicated().sum()
             info["duplicate_timestamps"] = duplicate_count
+        
+        return info
+
+    def update_drifter_data(self, force_update=False):
+        """Update drifter data from SPOT Tracker API"""
+        if not self.spot_api:
+            return pd.DataFrame()
+        
+        # Check if we need to update based on interval
+        now = pd.Timestamp.now(tz='UTC')
+        if (not force_update and self.last_drifter_update and 
+            (now - self.last_drifter_update).total_seconds() < self.drifter_update_interval):
+            logger.debug("Skipping drifter update - within update interval")
+            return self.drifter_data.copy()
+        
+        try:
+            logger.info("Updating drifter data from SPOT Tracker API")
+            
+            # Get messages from SPOT API
+            messages = self.spot_api.get_messages()
+            
+            if not messages:
+                logger.warning("No drifter messages received from SPOT API")
+                return self.drifter_data.copy()
+            
+            # Convert SPOT messages to DataFrame
+            drifter_records = []
+            for msg in messages:
+                record = {
+                    'datetime_utc': pd.to_datetime(msg.timestamp, utc=True),
+                    'latitude': msg.latitude,
+                    'longitude': msg.longitude,
+                    'drifter_id': getattr(msg, 'device_id', 'unknown'),
+                    'message_type': getattr(msg, 'message_type', 'position'),
+                    'battery_state': getattr(msg, 'battery_state', None),
+                }
+                drifter_records.append(record)
+            
+            new_drifter_data = pd.DataFrame(drifter_records)
+            
+            if not new_drifter_data.empty:
+                # Sort by datetime
+                new_drifter_data = new_drifter_data.sort_values('datetime_utc').reset_index(drop=True)
+                
+                # Store the new data
+                with self.lock:
+                    self.drifter_data = new_drifter_data
+                    self.last_drifter_update = now
+                
+                logger.info(f"Updated drifter data: {len(new_drifter_data)} positions")
+                logger.debug(f"Drifter data time range: {new_drifter_data['datetime_utc'].min()} to {new_drifter_data['datetime_utc'].max()}")
+            
+            return new_drifter_data.copy()
+            
+        except Exception as e:
+            logger.error(f"Error updating drifter data: {e}", exc_info=True)
+            return self.drifter_data.copy()
+    
+    def get_drifter_data(self, start_time=None, end_time=None):
+        """Get drifter data with optional time filtering"""
+        with self.lock:
+            data = self.drifter_data.copy()
+        
+        if data.empty:
+            return data
+        
+        # Filter by time range
+        if start_time:
+            if not isinstance(start_time, pd.Timestamp):
+                start_time = pd.to_datetime(start_time)
+            # Handle timezone conversion
+            if start_time.tz is not None and data["datetime_utc"].dt.tz is None:
+                start_time = start_time.tz_convert(None)
+            elif start_time.tz is None and data["datetime_utc"].dt.tz is not None:
+                start_time = start_time.tz_localize('UTC')
+            data = data[data["datetime_utc"] >= start_time]
+        
+        if end_time:
+            if not isinstance(end_time, pd.Timestamp):
+                end_time = pd.to_datetime(end_time)
+            # Handle timezone conversion
+            if end_time.tz is not None and data["datetime_utc"].dt.tz is None:
+                end_time = end_time.tz_convert(None)
+            elif end_time.tz is None and data["datetime_utc"].dt.tz is not None:
+                end_time = end_time.tz_localize('UTC')
+            data = data[data["datetime_utc"] <= end_time]
+        
+        return data
+    
+    def get_drifter_info(self):
+        """Get information about drifter data for debugging"""
+        with self.lock:
+            data = self.drifter_data.copy()
+        
+        if data.empty:
+            return {
+                "status": "No drifter data",
+                "api_available": self.spot_api is not None,
+                "feed_id": self.spot_feed_id,
+                "last_update": str(self.last_drifter_update) if self.last_drifter_update else "Never"
+            }
+        
+        info = {
+            "status": "Active",
+            "api_available": self.spot_api is not None,
+            "feed_id": self.spot_feed_id,
+            "total_positions": len(data),
+            "time_range": f"{data['datetime_utc'].min()} to {data['datetime_utc'].max()}",
+            "last_update": str(self.last_drifter_update) if self.last_drifter_update else "Never",
+            "unique_drifters": data['drifter_id'].nunique() if 'drifter_id' in data.columns else 0,
+            "update_interval": f"{self.drifter_update_interval}s"
+        }
         
         return info
