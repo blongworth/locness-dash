@@ -62,6 +62,34 @@ app = dash.Dash(
 )
 server = app.server
 
+# Add custom CSS for blinking animation
+app.index_string = '''
+<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        {%favicon%}
+        {%css%}
+        <style>
+            @keyframes blink {
+                0% { opacity: 1; }
+                50% { opacity: 0.3; }
+                100% { opacity: 1; }
+            }
+        </style>
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>
+'''
+
 # Shared data store for filtered data to avoid redundant processing
 filtered_data_store = {"data": pd.DataFrame(), "last_update": 0, "params": {}}
 
@@ -442,6 +470,7 @@ def update_correlation_plots(toggle, n_intervals, x_col, y_col, resample_freq,
 
 @callback(
     [Output("ph-value", "children"),
+     Output("ph-value", "style"),
      Output("rho-value", "children"),
      Output("last-update-display", "children"),
      Output("most-recent-timestamp-display", "children"),
@@ -456,6 +485,7 @@ def update_correlation_plots(toggle, n_intervals, x_col, y_col, resample_freq,
 def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update):
     """Update status information including comprehensive statistics"""
     ph_val = "No Data"
+    ph_style = {"fontSize": "2.5rem"}  # Default style
     rho_val = "No Data"
     
     if not data_manager.data.empty:
@@ -463,7 +493,20 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
         if "ph_corrected_ma" in data_manager.data.columns:
             latest_ph = data_manager.data["ph_corrected_ma"].dropna()
             if not latest_ph.empty:
-                ph_val = f"{latest_ph.iloc[-1]:.2f}"
+                ph_value = latest_ph.iloc[-1]
+                ph_val = f"{ph_value:.2f}"
+                
+                # Add threshold-based coloring and animation
+                if ph_value > 10:  # Critical threshold - flashing red
+                    ph_style = {
+                        "fontSize": "2.5rem", 
+                        "color": "red",
+                        "animation": "blink 1s infinite"
+                    }
+                elif ph_value > 8.7:  # Warning threshold - solid red
+                    ph_style = {"fontSize": "2.5rem", "color": "red"}
+                else:  # Normal range - default color
+                    ph_style = {"fontSize": "2.5rem"}
         
         # Rho value from latest data
         if "rho_ppb" in data_manager.data.columns:
@@ -499,6 +542,7 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
     
     return (
         ph_val, 
+        ph_style,
         rho_val, 
         current_time,
         most_recent_timestamp_display,
