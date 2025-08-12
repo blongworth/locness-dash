@@ -64,6 +64,7 @@ server = app.server
 
 # Shared data store for filtered data to avoid redundant processing
 filtered_data_store = {"data": pd.DataFrame(), "last_update": 0, "params": {}}
+filtered_data_lock = threading.Lock()
 
 def get_available_fields():
     """Get numeric fields for dropdowns"""
@@ -75,53 +76,75 @@ def get_available_fields():
         and data_manager.data[col].dtype in ["float64", "int64"]
     ]
 
-def get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals):
+def get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals, time_range_slider=None):
     """Get filtered data with caching to avoid redundant processing"""
     global filtered_data_store
     
-    # Create cache key
+    # Create cache key - only include n_intervals if it actually affects the data
+    # For auto_update mode, we only care about n_intervals when time_range_mode != 0 (not "All")
     cache_key = {
         "time_range_mode": time_range_mode,
         "auto_update": auto_update,
         "resample_freq": resample_freq,
         "data_len": len(data_manager.data),
-        "n_intervals": n_intervals if auto_update else 0  # Only include intervals in auto mode
+        "data_max_timestamp": str(data_manager.data["datetime_utc"].max()) if not data_manager.data.empty and "datetime_utc" in data_manager.data.columns else None,
+        "time_range_slider": tuple(time_range_slider) if time_range_slider else None
     }
     
-    # Return cached data if parameters haven't changed
-    if (filtered_data_store["params"] == cache_key and 
-        not filtered_data_store["data"].empty):
-        return filtered_data_store["data"]
+    # Only include n_intervals in cache key if auto_update is on AND it affects the time range
+    # (i.e., when not using "All" data or custom rangeslider)
+    if auto_update and time_range_mode != 0:
+        cache_key["n_intervals"] = n_intervals
     
-    # Calculate time range
-    if data_manager.data.empty or "datetime_utc" not in data_manager.data.columns:
-        filtered_data_store = {"data": pd.DataFrame(), "last_update": 0, "params": cache_key}
-        return pd.DataFrame()
-    
-    datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
-    max_ts = datetime_utcs.max().timestamp()
-    
-    # Simple time range calculation
-    hours_map = {0: None, 1: 24, 2: 8, 3: 4, 4: 2, 5: 1}
-    hours = hours_map.get(time_range_mode, 4)
-    
-    if hours is None:  # All data
-        start_time = None
-    else:
-        start_ts = max_ts - (hours * 3600)
-        start_time = datetime.fromtimestamp(start_ts, tz=timezone.utc)
-    
-    end_time = datetime.fromtimestamp(max_ts, tz=timezone.utc)
-    
-    # Get filtered data
-    if resample_freq == "None":
-        data = data_manager.get_data(start_time, end_time)
-    else:
-        data = data_manager.get_data(start_time, end_time, resample_freq)
-    
-    # Cache the result
-    filtered_data_store = {"data": data, "last_update": time.time(), "params": cache_key}
-    return data
+    # Use lock to prevent multiple simultaneous computations
+    with filtered_data_lock:
+        # Check cache again inside the lock (double-checked locking pattern)
+        if (filtered_data_store.get("params") == cache_key and 
+            not filtered_data_store.get("data", pd.DataFrame()).empty):
+            logger.debug("Returning cached data (locked)")
+            return filtered_data_store["data"]
+        
+        logger.info("Computing new filtered data")
+        
+        # Calculate time range
+        if data_manager.data.empty or "datetime_utc" not in data_manager.data.columns:
+            filtered_data_store = {"data": pd.DataFrame(), "last_update": 0, "params": cache_key}
+            return pd.DataFrame()
+        
+        datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
+        max_ts = datetime_utcs.max().timestamp()
+        
+        # Determine time range source
+        use_rangeslider = (not auto_update and time_range_slider and 
+                          len(time_range_slider) == 2 and time_range_mode == 0)
+        
+        if use_rangeslider:
+            # Use rangeslider values when manual mode and "All" is selected
+            start_ts, end_ts = time_range_slider
+            start_time = datetime.fromtimestamp(start_ts, tz=timezone.utc)
+            end_time = datetime.fromtimestamp(end_ts, tz=timezone.utc)
+        else:
+            # Use time-range-mode calculation
+            hours_map = {0: None, 1: 24, 2: 8, 3: 4, 4: 2, 5: 1}
+            hours = hours_map.get(time_range_mode, 4)
+            
+            if hours is None:  # All data
+                start_time = None
+            else:
+                start_ts = max_ts - (hours * 3600)
+                start_time = datetime.fromtimestamp(start_ts, tz=timezone.utc)
+            
+            end_time = datetime.fromtimestamp(max_ts, tz=timezone.utc)
+        
+        # Get filtered data
+        if resample_freq == "None":
+            data = data_manager.get_data(start_time, end_time)
+        else:
+            data = data_manager.get_data(start_time, end_time, resample_freq)
+        
+        # Cache the result
+        filtered_data_store = {"data": data, "last_update": time.time(), "params": cache_key}
+        return data
 
 # App layout (simplified)
 app.layout = html.Div([
@@ -183,6 +206,18 @@ app.layout = html.Div([
                                 0: "All", 1: "24h", 2: "8h",
                                 3: "4h", 4: "2h", 5: "1h"
                             },
+                            className="mb-3"
+                        ),
+                        dbc.Label("Custom Time Range:"),
+                        dcc.RangeSlider(
+                            id="time-range-slider",
+                            min=0,
+                            max=100,
+                            step=1,
+                            value=[0, 100],
+                            marks={},
+                            tooltip={"placement": "bottom", "always_visible": True},
+                            disabled=True,
                             className="mb-3"
                         ),
                         html.Hr(),
@@ -330,6 +365,69 @@ def auto_adjust_resample(time_range_mode, current_resample):
     return resample_map.get(time_range_mode, "1min")
 
 @callback(
+    [Output("time-range-slider", "min"),
+     Output("time-range-slider", "max"),
+     Output("time-range-slider", "value"),
+     Output("time-range-slider", "marks"),
+     Output("time-range-slider", "disabled")],
+    [Input("interval-component", "n_intervals"),
+     Input("time-range-mode", "value"),
+     Input("auto-update-toggle", "value")],
+    [State("time-range-slider", "value")]
+)
+def update_time_range_slider(n_intervals, time_range_mode, auto_update, current_value):
+    """Update rangeslider based on available data and settings"""
+    if data_manager.data.empty or "datetime_utc" not in data_manager.data.columns:
+        return 0, 100, [0, 100], {}, True
+    
+    # Get data time range
+    datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
+    min_timestamp = datetime_utcs.min().timestamp()
+    max_timestamp = datetime_utcs.max().timestamp()
+    
+    # Create marks for the slider (show 5 evenly spaced timestamps)
+    time_span = max_timestamp - min_timestamp
+    marks = {}
+    for i in range(5):
+        timestamp = min_timestamp + (i * time_span / 4)
+        dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        marks[timestamp] = dt.strftime("%m/%d %H:%M")
+    
+    # Calculate default range based on time-range-mode
+    hours_map = {0: None, 1: 24, 2: 8, 3: 4, 4: 2, 5: 1}
+    hours = hours_map.get(time_range_mode, 4)
+    
+    if auto_update:
+        # In auto-update mode, end time is always the latest
+        end_timestamp = max_timestamp
+        if hours is None:  # All data
+            start_timestamp = min_timestamp
+        else:
+            start_timestamp = max(min_timestamp, max_timestamp - (hours * 3600))
+        value = [start_timestamp, end_timestamp]
+    else:
+        # In manual mode, preserve user's selection if valid
+        if current_value and len(current_value) == 2:
+            start_ts, end_ts = current_value
+            # Ensure values are within bounds
+            start_ts = max(min_timestamp, min(start_ts, max_timestamp))
+            end_ts = max(min_timestamp, min(end_ts, max_timestamp))
+            value = [start_ts, end_ts]
+        else:
+            # Default to time-range-mode setting
+            end_timestamp = max_timestamp
+            if hours is None:
+                start_timestamp = min_timestamp
+            else:
+                start_timestamp = max(min_timestamp, max_timestamp - (hours * 3600))
+            value = [start_timestamp, end_timestamp]
+    
+    # Disable when auto-update is on and time-range-mode is not "All"
+    disabled = auto_update and time_range_mode != 0
+    
+    return min_timestamp, max_timestamp, value, marks, disabled
+
+@callback(
     [Output("timeseries-plot", "figure"),
      Output("map-plot", "figure"),
      Output("all-fields-timeseries-plot", "figure")],
@@ -339,15 +437,16 @@ def auto_adjust_resample(time_range_mode, current_resample):
      Input("map-field-dropdown", "value"),
      Input("resample-dropdown", "value"),
      Input("time-range-mode", "value"),
-     Input("auto-update-toggle", "value")]
+     Input("auto-update-toggle", "value"),
+     Input("time-range-slider", "value")]
 )
 def update_main_plots(toggle, n_intervals, ts_fields, map_field, resample_freq, 
-                     time_range_mode, auto_update):
+                     time_range_mode, auto_update, time_range_slider):
     """Main plots callback - simplified and optimized"""
     template = light_theme if toggle else dark_theme
     
     # Get filtered data using cache
-    data = get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals)
+    data = get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals, time_range_slider)
     
     if data.empty:
         empty_fig = {"data": [], "layout": {"template": template}}
@@ -379,14 +478,15 @@ def update_main_plots(toggle, n_intervals, ts_fields, map_field, resample_freq,
      Input("map-field-dropdown", "value"),
      Input("resample-dropdown", "value"),
      Input("time-range-mode", "value"),
-     Input("auto-update-toggle", "value")]
+     Input("auto-update-toggle", "value"),
+     Input("time-range-slider", "value")]
 )
 def update_dispersal_plots(toggle, n_intervals, map_field, resample_freq, 
-                          time_range_mode, auto_update):
+                          time_range_mode, auto_update, time_range_slider):
     """Dispersal view plots"""
     template = light_theme if toggle else dark_theme
     
-    data = get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals)
+    data = get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals, time_range_slider)
     
     if data.empty:
         empty_fig = {"data": [], "layout": {"template": template}}
@@ -412,10 +512,11 @@ def update_dispersal_plots(toggle, n_intervals, map_field, resample_freq,
      Input("correlation-y-dropdown", "value"),
      Input("resample-dropdown", "value"),
      Input("time-range-mode", "value"),
-     Input("auto-update-toggle", "value")]
+     Input("auto-update-toggle", "value"),
+     Input("time-range-slider", "value")]
 )
 def update_correlation_plots(toggle, n_intervals, x_col, y_col, resample_freq,
-                           time_range_mode, auto_update):
+                           time_range_mode, auto_update, time_range_slider):
     """Correlation plots"""
     template = light_theme if toggle else dark_theme
     
@@ -423,7 +524,7 @@ def update_correlation_plots(toggle, n_intervals, x_col, y_col, resample_freq,
         empty_fig = {"data": [], "layout": {"template": template}}
         return empty_fig, empty_fig
     
-    data = get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals)
+    data = get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals, time_range_slider)
     
     if data.empty:
         empty_fig = {"data": [], "layout": {"template": template}}
@@ -452,9 +553,10 @@ def update_correlation_plots(toggle, n_intervals, x_col, y_col, resample_freq,
     [Input("interval-component", "n_intervals"),
      Input("time-range-mode", "value"),
      Input("resample-dropdown", "value"),
-     Input("auto-update-toggle", "value")]
+     Input("auto-update-toggle", "value"),
+     Input("time-range-slider", "value")]
 )
-def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update):
+def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update, time_range_slider):
     """Update status information including comprehensive statistics"""
     ph_val = "No Data"
     ph_style = {"fontSize": "2.5rem"}  # Default style
@@ -507,7 +609,7 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
     
     # Get filtered data count (using same logic as get_filtered_data)
     try:
-        filtered_data = get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals)
+        filtered_data = get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals, time_range_slider)
         total_rows_filtered = len(filtered_data)
     except Exception as e:
         logger.error(f"Error getting filtered data count: {e}")
@@ -533,8 +635,9 @@ def background_update():
             if not new_data.empty:
                 logger.info("Retrieved %d new records", len(new_data))
                 # Clear cache when new data arrives
-                global filtered_data_store
-                filtered_data_store = {"data": pd.DataFrame(), "last_update": 0, "params": {}}
+                with filtered_data_lock:
+                    global filtered_data_store
+                    filtered_data_store = {"data": pd.DataFrame(), "last_update": 0, "params": {}}
         except Exception as e:
             logger.warning("Error during background update: %s", e)
 
