@@ -114,9 +114,9 @@ def get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals, 
         datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
         max_ts = datetime_utcs.max().timestamp()
         
-        # Determine time range source
-        use_rangeslider = (not auto_update and time_range_slider and 
-                          len(time_range_slider) == 2 and time_range_mode == 0)
+        # Determine time range source - only use rangeslider when auto_update is off and time_range_mode is "All" (0)
+        use_rangeslider = (not auto_update and time_range_mode == 0 and time_range_slider and 
+                          len(time_range_slider) == 2)
         
         if use_rangeslider:
             # Use rangeslider values when manual mode and "All" is selected
@@ -208,7 +208,6 @@ app.layout = html.Div([
                             },
                             className="mb-3"
                         ),
-                        dbc.Label("Custom Time Range:"),
                         dcc.RangeSlider(
                             id="time-range-slider",
                             min=0,
@@ -393,37 +392,47 @@ def update_time_range_slider(n_intervals, time_range_mode, auto_update, current_
         dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
         marks[timestamp] = dt.strftime("%m/%d %H:%M")
     
+    # Determine if slider should be enabled: only when auto-update is OFF and time-range-mode is "All" (0)
+    disabled = auto_update or time_range_mode != 0
+    
     # Calculate default range based on time-range-mode
     hours_map = {0: None, 1: 24, 2: 8, 3: 4, 4: 2, 5: 1}
     hours = hours_map.get(time_range_mode, 4)
     
+    # Check if this callback was triggered by time-range-mode change
+    ctx = dash.callback_context
+    triggered_by_mode_change = any(prop_id.endswith('time-range-mode.value') for prop_id in [t['prop_id'] for t in ctx.triggered])
+    
     if auto_update:
-        # In auto-update mode, end time is always the latest
+        # In auto-update mode, max is always the latest data timestamp
         end_timestamp = max_timestamp
-        if hours is None:  # All data
+        if hours is None:  # All data - show full range from min to max
             start_timestamp = min_timestamp
         else:
+            # Time range mode is not "All" - calculate start based on hours from max
             start_timestamp = max(min_timestamp, max_timestamp - (hours * 3600))
         value = [start_timestamp, end_timestamp]
     else:
-        # In manual mode, preserve user's selection if valid
-        if current_value and len(current_value) == 2:
-            start_ts, end_ts = current_value
-            # Ensure values are within bounds
-            start_ts = max(min_timestamp, min(start_ts, max_timestamp))
-            end_ts = max(min_timestamp, min(end_ts, max_timestamp))
-            value = [start_ts, end_ts]
-        else:
-            # Default to time-range-mode setting
-            end_timestamp = max_timestamp
-            if hours is None:
-                start_timestamp = min_timestamp
+        # Manual mode (auto-update off)
+        if time_range_mode == 0:  # "All" data mode - slider is enabled
+            # If user just switched to "All" mode, reset to full range
+            # Otherwise, preserve user's selection if valid
+            if triggered_by_mode_change:
+                value = [min_timestamp, max_timestamp]
+            elif current_value and len(current_value) == 2:
+                start_ts, end_ts = current_value
+                # Ensure values are within bounds
+                start_ts = max(min_timestamp, min(start_ts, max_timestamp))
+                end_ts = max(min_timestamp, min(end_ts, max_timestamp))
+                value = [start_ts, end_ts]
             else:
-                start_timestamp = max(min_timestamp, max_timestamp - (hours * 3600))
+                # Default to full range when no current value - use actual data min/max
+                value = [min_timestamp, max_timestamp]
+        else:
+            # Time range mode is not "All" - slider is disabled, show calculated range
+            end_timestamp = max_timestamp
+            start_timestamp = max(min_timestamp, max_timestamp - (hours * 3600))
             value = [start_timestamp, end_timestamp]
-    
-    # Disable when auto-update is on and time-range-mode is not "All"
-    disabled = auto_update and time_range_mode != 0
     
     return min_timestamp, max_timestamp, value, marks, disabled
 
