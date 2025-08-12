@@ -392,7 +392,7 @@ class DataManager:
 
         # Add moving averages
         # TODO: Checkbox to turn on/off moving averages
-        self.add_2min_moving_averages()
+        # self.add_2min_moving_averages()  # Disabled - moving averages calculation turned off
 
         # Filter by time range (start_time and end_time should be pandas datetimes)
         if start_time:
