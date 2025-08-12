@@ -275,7 +275,18 @@ class DataManager:
         with self.lock:
             try:
                 if self.is_dynamodb:
-                    self.data = self._query_dynamodb_data()
+                    # Use scan operation for fastest bulk loading of all data
+                    logger.debug("DynamoDB: Loading all data using table scan")
+                    response = self.table.scan()
+                    items = response['Items']
+                    
+                    # Handle pagination to get all items
+                    while 'LastEvaluatedKey' in response:
+                        response = self.table.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+                        items.extend(response['Items'])
+                    
+                    logger.debug(f"DynamoDB: Retrieved {len(items)} total items from scan")
+                    self.data = self._process_dynamodb_items(items)
                 elif self.is_parquet:
                     self.data = pd.read_parquet(self.data_path, engine="pyarrow")
                     # Convert Unix timestamp to datetime if needed
