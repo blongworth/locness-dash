@@ -117,9 +117,9 @@ def create_dispersal_plot(data, template="bootstrap"):
         yaxis1_title="pH",  # Label for pH subplot
         yaxis2_title="Rho [ppb]",  # Label for Rho subplot
         legend=dict(
-            x=1,  # Move legend back to right edge
+            x=0,  # Move legend back to right edge
             y=1,
-            xanchor="right",
+            xanchor="left",
             yanchor="top",
             bgcolor="rgba(0,0,0,0)",  # Make the background transparent
         ),
