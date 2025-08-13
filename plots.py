@@ -178,15 +178,15 @@ def create_map_plot(df, field, template="bootstrap", style=None):
         lon_range = max_lon - min_lon
         max_range = max(lat_range, lon_range)
         if max_range < 0.002:
-            zoom = 19
-        elif max_range < 0.01:
             zoom = 17
-        elif max_range < 0.05:
+        elif max_range < 0.01:
             zoom = 15
-        elif max_range < 0.2:
+        elif max_range < 0.05:
             zoom = 13
-        else:
+        elif max_range < 0.2:
             zoom = 11
+        else:
+            zoom = 9
     else:
         center_lat, center_lon = 42.3601, -71.0589
         zoom = 12
