@@ -250,7 +250,7 @@ app.layout = html.Div([
                             dbc.Col([
                                 dbc.Card([
                                     dbc.CardBody([
-                                        html.H6("pH (2min avg)", className="text-center"),
+                                        html.H6("pH", className="text-center"),
                                         html.H2(id="ph-value", children="No Data", 
                                                className="text-center", style={"fontSize": "2.5rem"})
                                     ])
@@ -573,25 +573,32 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update,
     
     if not data_manager.data.empty:
         # pH value from latest data
-        if "ph_corrected_ma" in data_manager.data.columns:
-            latest_ph = data_manager.data["ph_corrected_ma"].dropna()
+        if "ph_corrected" in data_manager.data.columns:
+            latest_ph = data_manager.data["ph_corrected"].dropna()
             if not latest_ph.empty:
                 ph_value = latest_ph.iloc[-1]
                 ph_val = f"{ph_value:.2f}"
                 
-                # Add threshold-based coloring and animation
-                if ph_value > 10:  # Critical threshold - red, bold, and bright
-                    ph_style = {
-                        "fontSize": "2.5rem", 
-                        "color": "red",
-                        "fontWeight": "bold",
-                        "filter": "brightness(1.5)"
-                    }
-                elif ph_value > 8.7:  # Warning threshold - red only
-                    ph_style = {"fontSize": "2.5rem", "color": "red"}
-                else:  # Normal range - default color
-                    ph_style = {"fontSize": "2.5rem"}
         
+        # if "ph_corrected_ma" in data_manager.data.columns:
+        #     latest_ph = data_manager.data["ph_corrected_ma"].dropna()
+        #     if not latest_ph.empty:
+        #         ph_value = latest_ph.iloc[-1]
+        #         ph_val = f"{ph_value:.2f}"
+        #         
+        #         # Add threshold-based coloring and animation
+        #         if ph_value > 10:  # Critical threshold - red, bold, and bright
+        #             ph_style = {
+        #                 "fontSize": "2.5rem", 
+        #                 "color": "red",
+        #                 "fontWeight": "bold",
+        #                 "filter": "brightness(1.5)"
+        #             }
+        #         elif ph_value > 8.7:  # Warning threshold - red only
+        #             ph_style = {"fontSize": "2.5rem", "color": "red"}
+        #         else:  # Normal range - default color
+        #             ph_style = {"fontSize": "2.5rem"}
+
         # Rho value from latest data
         if "rho_ppb" in data_manager.data.columns:
             latest_rho = data_manager.data["rho_ppb"].dropna()

@@ -80,22 +80,22 @@ def create_dispersal_plot(data, template="bootstrap"):
                 y=data["ph_corrected"],
                 mode="lines",
                 name="pH",
-                line=dict(color="lightblue"),
-            ),
-            row=1,
-            col=1,
-        )
-        dispersal_fig.add_trace(
-            go.Scatter(
-                x=data["datetime_utc"],
-                y=data["ph_corrected_ma"],
-                mode="lines",
-                name="pH (2 min avg)",
                 line=dict(color="blue"),
             ),
             row=1,
             col=1,
         )
+        # dispersal_fig.add_trace(
+        #     go.Scatter(
+        #         x=data["datetime_utc"],
+        #         y=data["ph_corrected_ma"],
+        #         mode="lines",
+        #         name="pH (2 min avg)",
+        #         line=dict(color="blue"),
+        #     ),
+        #     row=1,
+        #     col=1,
+        # )
 
     if "rho_ppb" in data.columns:
         dispersal_fig.add_trace(
