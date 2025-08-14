@@ -217,15 +217,15 @@ app.layout = html.Div([
                                 dbc.Card([
                                     dbc.CardBody([
                                         html.H6("pH", className="text-center"),
-                                        html.H2(id="ph-value", children="No Data", 
-                                               className="text-center", style={"fontSize": "2.5rem"})
+                                        html.H3(id="ph-value", children="No Data", 
+                                               className="text-center", style={"fontSize": "1.8rem"})
                                     ])
                                 ], className="mb-2", color="light", outline=True),
                                 dbc.Card([
                                     dbc.CardBody([
                                         html.H6("Rho (ppb)", className="text-center"),
-                                        html.H2(id="rho-value", children="No Data", 
-                                               className="text-center", style={"fontSize": "2.5rem"})
+                                        html.H3(id="rho-value", children="No Data", 
+                                               className="text-center", style={"fontSize": "1.8rem"})
                                     ])
                                 ], color="light", outline=True)
                             ], width=2)
@@ -457,7 +457,7 @@ def update_correlation_plots(toggle, n_intervals, x_col, y_col, resample_freq,
 def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update):
     """Update status information including comprehensive statistics"""
     ph_val = "No Data"
-    ph_style = {"fontSize": "2.5rem"}  # Default style
+    ph_style = {"fontSize": "1.8rem"}  # Default style
     rho_val = "No Data"
     
     if not data_manager.data.empty:
@@ -466,7 +466,7 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
             latest_ph = data_manager.data["ph_corrected"].dropna()
             if not latest_ph.empty:
                 ph_value = latest_ph.iloc[-1]
-                ph_val = f"{ph_value:.2f}"
+                ph_val = f"{ph_value:.3f}"
                 
         
         # if "ph_corrected_ma" in data_manager.data.columns:
@@ -492,7 +492,7 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
         if "rho_ppb" in data_manager.data.columns:
             latest_rho = data_manager.data["rho_ppb"].dropna()
             if not latest_rho.empty:
-                rho_val = f"{latest_rho.iloc[-1]:.1f}"
+                rho_val = f"{latest_rho.iloc[-1]:.2f}"
     
     # Current time for last update
     current_time = datetime.now().strftime("%H:%M:%S")
