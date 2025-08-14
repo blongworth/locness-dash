@@ -1,5 +1,6 @@
 import tomllib
 import logging
+import os
 from datetime import datetime, timezone
 import threading
 import time
@@ -578,12 +579,20 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
         logger.error(f"Error getting filtered data count: {e}")
         total_rows_filtered = 0
     
-    # Drifter status
+    # Drifter status with asset information
     drifter_status = "N/A"
     if data_manager.spot_api:
         drifter_info = data_manager.get_drifter_info()
         if drifter_info["status"] == "Active":
-            drifter_status = f"{drifter_info['total_positions']} positions"
+            asset_count = drifter_info.get("unique_assets", 0)
+            total_positions = drifter_info["total_positions"]
+            
+            if asset_count > 1:
+                drifter_status = f"{asset_count} drifters, {total_positions} positions"
+            elif asset_count == 1:
+                drifter_status = f"1 drifter, {total_positions} positions"
+            else:
+                drifter_status = f"{total_positions} positions"
         else:
             drifter_status = "No data"
     

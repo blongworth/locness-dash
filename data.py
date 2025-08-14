@@ -589,11 +589,14 @@ class DataManager:
             # Convert SPOT messages to DataFrame
             drifter_records = []
             for msg in messages:
+                # Use asset_id if available, otherwise fall back to device_id
+                asset_id = getattr(msg, 'asset_id', None) or getattr(msg, 'device_id', 'unknown')
                 record = {
                     'datetime_utc': pd.to_datetime(msg.timestamp, utc=True),
                     'latitude': msg.latitude,
                     'longitude': msg.longitude,
-                    'drifter_id': getattr(msg, 'device_id', 'unknown'),
+                    'asset_id': asset_id,
+                    'drifter_id': getattr(msg, 'device_id', 'unknown'),  # Keep for compatibility
                     'message_type': getattr(msg, 'message_type', 'position'),
                     'battery_state': getattr(msg, 'battery_state', None),
                 }
@@ -670,7 +673,9 @@ class DataManager:
             "total_positions": len(data),
             "time_range": f"{data['datetime_utc'].min()} to {data['datetime_utc'].max()}",
             "last_update": str(self.last_drifter_update) if self.last_drifter_update else "Never",
+            "unique_assets": data['asset_id'].nunique() if 'asset_id' in data.columns else 0,
             "unique_drifters": data['drifter_id'].nunique() if 'drifter_id' in data.columns else 0,
+            "assets": data['asset_id'].unique().tolist() if 'asset_id' in data.columns else [],
             "update_interval": f"{self.drifter_update_interval}s"
         }
         

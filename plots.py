@@ -1,5 +1,6 @@
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+import plotly.express as px
 import numpy as np
 import pandas as pd
 
@@ -305,54 +306,64 @@ def create_map_plot(df, field, template="bootstrap", style=None, drifter_data=No
 
     # Add drifter traces if available and enabled
     if show_drifters and drifter_data is not None and not drifter_data.empty:
-        # Get unique drifter IDs
-        unique_drifters = drifter_data['drifter_id'].unique() if 'drifter_id' in drifter_data.columns else ['unknown']
+        # Determine which ID field to use (prefer asset_id)
+        id_field = 'asset_id' if 'asset_id' in drifter_data.columns else 'drifter_id'
+        unique_ids = drifter_data[id_field].unique()
         
-        # Color palette for different drifters
-        drifter_colors = ['orange', 'purple', 'green', 'yellow', 'cyan', 'magenta']
+        # Use a distinct color palette for drifters (qualitative colors)
+        drifter_colors = px.colors.qualitative.Set1
+        if len(unique_ids) > len(drifter_colors):
+            # Extend colors by cycling through the palette
+            drifter_colors = (drifter_colors * ((len(unique_ids) // len(drifter_colors)) + 1))[:len(unique_ids)]
         
-        for i, drifter_id in enumerate(unique_drifters):
-            if 'drifter_id' in drifter_data.columns:
-                drifter_positions = drifter_data[drifter_data['drifter_id'] == drifter_id]
-            else:
-                drifter_positions = drifter_data
+        # Create color mapping
+        id_color_map = dict(zip(unique_ids, drifter_colors))
+        
+        for asset_id in unique_ids:
+            asset_positions = drifter_data[drifter_data[id_field] == asset_id].copy()
             
-            if drifter_positions.empty:
+            if asset_positions.empty:
                 continue
-                
-            color = drifter_colors[i % len(drifter_colors)]
+            
+            # Sort by datetime for proper line plotting
+            asset_positions = asset_positions.sort_values('datetime_utc')
+            color = id_color_map[asset_id]
             
             # Add drifter track
             fig.add_trace(
                 go.Scattermap(
-                    lat=drifter_positions["latitude"],
-                    lon=drifter_positions["longitude"],
+                    lat=asset_positions["latitude"],
+                    lon=asset_positions["longitude"],
                     mode="lines+markers",
-                    line=dict(width=2, color=color),
+                    line=dict(width=3, color=color),
                     marker=dict(size=6, color=color),
-                    name=f"Drifter {drifter_id}",
+                    name=f"Drifter {asset_id}",
                     hovertemplate=(
-                        f"<b>Drifter {drifter_id}</b><br>"
+                        f"<b>Drifter {asset_id}</b><br>"
                         "Timestamp: %{customdata[0]}<br>"
                         "Lat: %{lat:.4f}          Lon: %{lon:.4f}<br>"
                         "<extra></extra>"
                     ),
-                    customdata=[[dt.strftime('%Y-%m-%d %H:%M:%S')] for dt in drifter_positions["datetime_utc"]],
+                    customdata=[[dt.strftime('%Y-%m-%d %H:%M:%S')] for dt in asset_positions["datetime_utc"]],
                 )
             )
             
-            # Add current drifter position marker
-            if not drifter_positions.empty:
-                latest_drifter = drifter_positions.iloc[-1]
+            # Add current drifter position marker with larger, distinct marker
+            if not asset_positions.empty:
+                latest_drifter = asset_positions.iloc[-1]
                 fig.add_trace(
                     go.Scattermap(
                         lat=[latest_drifter["latitude"]],
                         lon=[latest_drifter["longitude"]],
                         mode="markers",
-                        marker=dict(size=12, color=color, symbol="diamond"),
-                        name=f"Drifter {drifter_id} (current)",
+                        marker=dict(
+                            size=12, 
+                            color=color, 
+                            symbol="diamond"
+                        ),
+                        name=f"Drifter {asset_id} (current)",
                         hovertemplate=(
-                            f"<b>Drifter {drifter_id} - Current Position</b><br>"
+                            f"<b>Drifter {asset_id} - Current Position</b><br>"
                             f"Timestamp: {latest_drifter['datetime_utc'].strftime('%Y-%m-%d %H:%M:%S')}<br>"
                             f"Lat: {latest_drifter['latitude']:.4f}          Lon: {latest_drifter['longitude']:.4f}<br>"
                             "<extra></extra>"

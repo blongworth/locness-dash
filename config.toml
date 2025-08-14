@@ -8,10 +8,11 @@
 #data_path = "/Users/brett/Library/CloudStorage/GoogleDrive-blongworth@whoi.edu/Shared drives/locness/synthetic_data/loc_01_ship_data.parquet"
 #data_path = "../locness-datamanager/data/locness.db"
 #data_path = "/Volumes/LOCNESS_data/database/locness.db"
+data_path= "C:/Users/CSL 2/Documents/LOCNESS_data/database/locness.db"
 
 # DynamoDB configuration (optional - only use if data_path is empty)
-dynamodb_table = "locness-underway-summary"
-dynamodb_region = "us-east-1"
+# dynamodb_table = "locness-underway-summary"
+# dynamodb_region = "us-east-1"
 
 # Default resampling interval for the dropdown
 # Options: "1min", "10min", "1H", etc. or leave empty for no resampling
