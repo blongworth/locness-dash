@@ -93,7 +93,8 @@ def get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals):
     is_debug_reload = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
     
     # Check for new data when in auto-update mode (but not during debug reload)
-    if auto_update and data_manager.spot_api and not is_debug_reload:
+    # Skip on initial callback (n_intervals=0) since we already loaded drifter data during init
+    if auto_update and data_manager.spot_api and not is_debug_reload and n_intervals > 0:
         try:
             new_data = data_manager.get_new_data()
             if not new_data.empty:
