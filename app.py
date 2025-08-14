@@ -1,9 +1,8 @@
 import tomllib
 import logging
 import os
-from datetime import datetime, timezone
-import threading
 import time
+from datetime import datetime, timezone
 import pandas as pd
 
 import dash
@@ -75,8 +74,7 @@ app = dash.Dash(
 )
 server = app.server
 
-# Shared data store for filtered data to avoid redundant processing
-filtered_data_store = {"data": pd.DataFrame(), "last_update": 0, "params": {}}
+# Simplified data access without background thread caching
 
 def get_available_fields():
     """Get numeric fields for dropdowns"""
@@ -89,26 +87,25 @@ def get_available_fields():
     ]
 
 def get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals):
-    """Get filtered data with caching to avoid redundant processing"""
-    global filtered_data_store
+    """Get filtered data - simplified without caching"""
     
-    # Create cache key
-    cache_key = {
-        "time_range_mode": time_range_mode,
-        "auto_update": auto_update,
-        "resample_freq": resample_freq,
-        "data_len": len(data_manager.data),
-        "n_intervals": n_intervals if auto_update else 0  # Only include intervals in auto mode
-    }
+    # Skip data updates during debug reload
+    is_debug_reload = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
     
-    # Return cached data if parameters haven't changed
-    if (filtered_data_store["params"] == cache_key and 
-        not filtered_data_store["data"].empty):
-        return filtered_data_store["data"]
+    # Check for new data when in auto-update mode (but not during debug reload)
+    if auto_update and data_manager.spot_api and not is_debug_reload:
+        try:
+            new_data = data_manager.get_new_data()
+            if not new_data.empty:
+                logger.info("Retrieved %d new records", len(new_data))
+            
+            # Update drifter data periodically
+            data_manager.update_drifter_data()
+        except Exception as e:
+            logger.warning("Error during data update: %s", e)
     
     # Calculate time range
     if data_manager.data.empty or "datetime_utc" not in data_manager.data.columns:
-        filtered_data_store = {"data": pd.DataFrame(), "last_update": 0, "params": cache_key}
         return pd.DataFrame()
     
     datetime_utcs = pd.to_datetime(data_manager.data["datetime_utc"])
@@ -132,8 +129,6 @@ def get_filtered_data(time_range_mode, auto_update, resample_freq, n_intervals):
     else:
         data = data_manager.get_data(start_time, end_time, resample_freq)
     
-    # Cache the result
-    filtered_data_store = {"data": data, "last_update": time.time(), "params": cache_key}
     return data
 
 # App layout (simplified)
@@ -619,29 +614,6 @@ def update_status_info(n_intervals, time_range_mode, resample_freq, auto_update)
             str(total_rows_filtered),
             str(missing_rows_all_data)
         )
-
-# Background update thread
-def background_update():
-    while True:
-        time.sleep(config.get("update_interval", 5))
-        try:
-            new_data = data_manager.get_new_data()
-            if not new_data.empty:
-                logger.info("Retrieved %d new records", len(new_data))
-                # Clear cache when new data arrives
-                global filtered_data_store
-                filtered_data_store = {"data": pd.DataFrame(), "last_update": 0, "params": {}}
-            
-            # Update drifter data periodically
-            if data_manager.spot_api:
-                data_manager.update_drifter_data()
-                
-        except Exception as e:
-            logger.warning("Error during background update: %s", e)
-
-# Start background thread
-update_thread = threading.Thread(target=background_update, daemon=True)
-update_thread.start()
 
 if __name__ == "__main__":
     import os

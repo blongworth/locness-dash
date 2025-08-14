@@ -1,6 +1,5 @@
 import pandas as pd
 import sqlite3
-import threading
 import boto3
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal
@@ -26,7 +25,6 @@ class DataManager:
         self.dynamodb_region = dynamodb_region
         self.last_datetime_utc = None  # This will store pandas datetime
         self.data = pd.DataFrame()
-        self.lock = threading.Lock()
         self.is_parquet = data_path.endswith(".parquet") if data_path else False
         self.is_dynamodb = dynamodb_table is not None
         
@@ -300,38 +298,39 @@ class DataManager:
 
     def load_initial_data(self):
         """Load all existing data from the data source"""
-        with self.lock:
-            try:
-                if self.is_dynamodb:
-                    self.data = self._query_dynamodb_data()
-                elif self.is_parquet:
-                    self.data = pd.read_parquet(self.data_path, engine="pyarrow")
-                    # Convert Unix timestamp to datetime if needed
-                    if "datetime_utc" in self.data.columns:
-                        self.data["datetime_utc"] = pd.to_datetime(
-                            self.data["datetime_utc"], unit="s"
-                        )
-                else:
-                    conn = self.get_connection()
-                    query = "SELECT * FROM underway_summary ORDER BY datetime_utc"
-                    self.data = pd.read_sql_query(query, conn)
-                    conn.close()
-                    # Convert Unix timestamp to datetime after reading from SQLite
-                    if "datetime_utc" in self.data.columns:
-                        self.data["datetime_utc"] = pd.to_datetime(
-                            self.data["datetime_utc"], unit="s"
-                        )
+        try:
+            if self.is_dynamodb:
+                self.data = self._query_dynamodb_data()
+            elif self.is_parquet:
+                self.data = pd.read_parquet(self.data_path, engine="pyarrow")
+                # Convert Unix timestamp to datetime if needed
+                if "datetime_utc" in self.data.columns:
+                    self.data["datetime_utc"] = pd.to_datetime(
+                        self.data["datetime_utc"], unit="s"
+                    )
+            else:
+                conn = self.get_connection()
+                query = "SELECT * FROM underway_summary ORDER BY datetime_utc"
+                self.data = pd.read_sql_query(query, conn)
+                conn.close()
+                # Convert Unix timestamp to datetime after reading from SQLite
+                if "datetime_utc" in self.data.columns:
+                    self.data["datetime_utc"] = pd.to_datetime(
+                        self.data["datetime_utc"], unit="s"
+                    )
 
-                if not self.data.empty:
-                    # Set timestamp column (same as datetime_utc for consistency)
-                    self.last_datetime_utc = self.data["datetime_utc"].max()
-                    
-                    # Remove duplicates after loading initial data
-                    self._remove_duplicates_internal()
+            if not self.data.empty:
+                # Set timestamp column (same as datetime_utc for consistency)
+                self.last_datetime_utc = self.data["datetime_utc"].max()
+                
+                # Remove duplicates after loading initial data
+                self._remove_duplicates_internal()
+            
+            self.initial_data_loaded = True
 
-            except Exception as e:
-                logger.error(f"Error loading initial data: {e}", exc_info=True)
-                self.data = pd.DataFrame()
+        except Exception as e:
+            logger.error(f"Error loading initial data: {e}", exc_info=True)
+            self.data = pd.DataFrame()
 
     def get_new_data(self):
         """Get data newer than last_datetime_utc"""
@@ -372,13 +371,12 @@ class DataManager:
             if not new_data.empty:
                 logger.debug(f"DataManager: Found {len(new_data)} new rows")
 
-                with self.lock:
-                    self.data = pd.concat([self.data, new_data], ignore_index=True)
-                    # Update last_datetime_utc to the maximum datetime in the new data
-                    self.last_datetime_utc = new_data["datetime_utc"].max()
-                    
-                    # Remove duplicates after adding new data
-                    self._remove_duplicates_internal()
+                self.data = pd.concat([self.data, new_data], ignore_index=True)
+                # Update last_datetime_utc to the maximum datetime in the new data
+                self.last_datetime_utc = new_data["datetime_utc"].max()
+                
+                # Remove duplicates after adding new data
+                self._remove_duplicates_internal()
 
                 logger.debug(f"DataManager: data shape after append: {self.data.shape}")
                 logger.debug(f"DataManager: last_datetime_utc updated to {self.last_datetime_utc}")
@@ -391,8 +389,7 @@ class DataManager:
 
     def get_data(self, start_time=None, end_time=None, resample_freq=None):
         """Get data with optional time filtering and resampling"""
-        with self.lock:
-            data = self.data.copy()
+        data = self.data.copy()
 
         if data.empty:
             return data
@@ -511,13 +508,11 @@ class DataManager:
 
     def remove_duplicates(self):
         """Remove duplicate rows based on datetime_utc, keeping the last occurrence"""
-        with self.lock:
-            self._remove_duplicates_internal()
+        self._remove_duplicates_internal()
 
     def get_data_info(self):
         """Get information about the current data for debugging"""
-        with self.lock:
-            data = self.data.copy()
+        data = self.data.copy()
         
         if data.empty:
             return "No data loaded"
@@ -582,9 +577,8 @@ class DataManager:
                 new_drifter_data = new_drifter_data.sort_values('datetime_utc').reset_index(drop=True)
                 
                 # Store the new data
-                with self.lock:
-                    self.drifter_data = new_drifter_data
-                    self.last_drifter_update = now
+                self.drifter_data = new_drifter_data
+                self.last_drifter_update = now
                 
                 logger.info(f"Updated drifter data: {len(new_drifter_data)} positions")
                 logger.debug(f"Drifter data time range: {new_drifter_data['datetime_utc'].min()} to {new_drifter_data['datetime_utc'].max()}")
@@ -597,8 +591,7 @@ class DataManager:
     
     def get_drifter_data(self, start_time=None, end_time=None):
         """Get drifter data with optional time filtering"""
-        with self.lock:
-            data = self.drifter_data.copy()
+        data = self.drifter_data.copy()
         
         if data.empty:
             return data
@@ -628,8 +621,7 @@ class DataManager:
     
     def get_drifter_info(self):
         """Get information about drifter data for debugging"""
-        with self.lock:
-            data = self.drifter_data.copy()
+        data = self.drifter_data.copy()
         
         if data.empty:
             return {
