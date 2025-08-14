@@ -239,7 +239,7 @@ app.layout = html.Div([
                             dbc.Col([
                                 dbc.Card([
                                     dbc.CardBody([
-                                        html.H6("pH (2min avg)", className="text-center"),
+                                        html.H6("pH", className="text-center"),
                                         html.H2(id="ph-value", children="No Data", 
                                                className="text-center", style={"fontSize": "2.5rem"})
                                     ])

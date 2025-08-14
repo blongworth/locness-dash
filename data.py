@@ -407,10 +407,6 @@ class DataManager:
         if missing_before > 0:
             logger.warning(f"DataManager.get_data: Missing values before dropna: {missing_before}")
 
-        # Add moving averages
-        # TODO: Checkbox to turn on/off moving averages
-        self.add_2min_moving_averages()
-
         # Filter by time range (start_time and end_time should be pandas datetimes)
         if start_time:
             # Ensure start_time is a pandas datetime
@@ -500,29 +496,6 @@ class DataManager:
 
         logger.debug(f"DataManager.get_data: Final data shape: {data.shape}")
         return data
-
-    def add_2min_moving_averages(self):
-        """Add 2-minute moving averages for ph_corrected and ph_total as new columns, without overwriting existing *_ma columns."""
-        if self.data.empty or "datetime_utc" not in self.data.columns:
-            return
-        df = self.data.copy()
-        df = df.sort_values("datetime_utc")
-        if not pd.api.types.is_datetime64_any_dtype(df["datetime_utc"]):
-            df["datetime_utc"] = pd.to_datetime(df["datetime_utc"])
-        df.set_index("datetime_utc", inplace=True)
-        if "ph_corrected" in df.columns:
-            colname = "ph_corrected_ma_app"
-            if colname not in df.columns:
-                df[colname] = df["ph_corrected"].rolling("2min", min_periods=1).mean()
-        if "ph_total" in df.columns:
-            colname = "ph_total_ma_app"
-            if colname not in df.columns:
-                df[colname] = df["ph_total"].rolling("2min", min_periods=1).mean()
-        df.reset_index(inplace=True)
-        # Only update the new columns in self.data
-        for col in ["ph_corrected_ma_app", "ph_total_ma_app"]:
-            if col in df.columns:
-                self.data[col] = df[col]
 
     def _remove_duplicates_internal(self):
         """Internal method to remove duplicates without acquiring lock (assumes caller holds lock)"""
