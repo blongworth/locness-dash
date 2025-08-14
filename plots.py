@@ -149,12 +149,13 @@ def create_dispersal_plot(data, template="bootstrap"):
     return dispersal_fig
 
 
-def create_map_plot(df, field, template="bootstrap", style=None, drifter_data=None, show_drifters=False):
+def create_map_plot(df, field, template="bootstrap", style=None, drifter_data=None, show_drifters=False, uirevision=None):
     """
     Create a map plot with optional style and drifter traces.
     style: 'dark' (default) or 'bathymetry'.
     drifter_data: DataFrame with drifter position data
     show_drifters: bool to control drifter visibility
+    uirevision: string to control pan/zoom preservation across updates
     """
     if df.empty:
         return go.Figure()
@@ -372,11 +373,12 @@ def create_map_plot(df, field, template="bootstrap", style=None, drifter_data=No
                     )
                 )
 
-    fig.update_layout(
-        template=template,
-        map=dict(style=style, center=dict(lat=center_lat, lon=center_lon), zoom=zoom),
-        margin=dict(t=10, b=10, l=10, r=10),  # Adjust margins to reduce whitespace
-        legend=dict(
+    # Prepare layout kwargs
+    layout_kwargs = {
+        "template": template,
+        "map": dict(style=style, center=dict(lat=center_lat, lon=center_lon), zoom=zoom),
+        "margin": dict(t=10, b=10, l=10, r=10),  # Adjust margins to reduce whitespace
+        "legend": dict(
             x=0.99,
             y=0.99,
             xanchor="right",
@@ -386,7 +388,13 @@ def create_map_plot(df, field, template="bootstrap", style=None, drifter_data=No
             borderwidth=1,
             font=dict(size=13),
         ),
-    )
+    }
+    
+    # Add uirevision if provided to preserve pan/zoom state
+    if uirevision is not None:
+        layout_kwargs["uirevision"] = uirevision
+    
+    fig.update_layout(**layout_kwargs)
     return fig
 
 

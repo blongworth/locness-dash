@@ -391,20 +391,32 @@ def update_main_plots(toggle, n_intervals, ts_fields, map_field, resample_freq,
     
     # Create plots
     ts_fig = create_timeseries_plot(data, ts_fields or [], template=template)
+    
+    # For map uirevision, create a stable ID based on main data characteristics
+    # This ensures drifter updates don't reset the map view
+    if auto_update:
+        # Use main data hash for stable uirevision when auto-updating
+        # This way, only changes to the main data will reset the map view
+        main_data_signature = f"{len(data)}-{data['datetime_utc'].max().isoformat() if not data.empty and 'datetime_utc' in data.columns else 'empty'}"
+        map_uirevision = f"map-auto-{main_data_signature}"
+    else:
+        map_uirevision = "map-constant"
+    
     map_fig = create_map_plot(data, map_field, template=template, 
-                             drifter_data=drifter_data, show_drifters=show_drifters)
+                             drifter_data=drifter_data, show_drifters=show_drifters,
+                             uirevision=map_uirevision)
     
     # All fields plot
     exclude = ["datetime_utc", "index", "id", "partition"]
     all_fields = [col for col in data.columns if col not in exclude]
     all_ts_fig = create_timeseries_plot(data, all_fields, template=template)
     
-    # Set uirevision for smooth updates
-    uirevision = f"auto-{len(data)}" if auto_update else "constant"
+    # Set uirevision for timeseries plots (can be different from map)
+    ts_uirevision = f"ts-auto-{len(data)}" if auto_update else "ts-constant"
     
-    for fig in [ts_fig, map_fig, all_ts_fig]:
+    for fig in [ts_fig, all_ts_fig]:
         if fig and hasattr(fig, 'update_layout'):
-            fig.update_layout(uirevision=uirevision, transition={"duration": 100})
+            fig.update_layout(uirevision=ts_uirevision, transition={"duration": 100})
     
     return ts_fig, map_fig, all_ts_fig
 
@@ -446,14 +458,23 @@ def update_dispersal_plots(toggle, n_intervals, map_field, resample_freq,
             drifter_data = data_manager.get_drifter_data(start_time=start_time, end_time=end_time)
     
     dispersal_fig = create_dispersal_plot(data, template=template)
+    
+    # Use stable uirevision for map to preserve pan/zoom when only drifter data changes
+    if auto_update:
+        main_data_signature = f"{len(data)}-{data['datetime_utc'].max().isoformat() if not data.empty and 'datetime_utc' in data.columns else 'empty'}"
+        map_uirevision = f"dispersal-map-auto-{main_data_signature}"
+    else:
+        map_uirevision = "dispersal-map-constant"
+    
     map_fig = create_map_plot(data, map_field, template=template,
-                             drifter_data=drifter_data, show_drifters=show_drifters)
+                             drifter_data=drifter_data, show_drifters=show_drifters,
+                             uirevision=map_uirevision)
     
-    uirevision = f"dispersal-{len(data)}" if auto_update else "dispersal-constant"
+    # Use separate uirevision for dispersal plot
+    dispersal_uirevision = f"dispersal-{len(data)}" if auto_update else "dispersal-constant"
     
-    for fig in [dispersal_fig, map_fig]:
-        if fig and hasattr(fig, 'update_layout'):
-            fig.update_layout(uirevision=uirevision, transition={"duration": 100})
+    if dispersal_fig and hasattr(dispersal_fig, 'update_layout'):
+        dispersal_fig.update_layout(uirevision=dispersal_uirevision, transition={"duration": 100})
     
     return dispersal_fig, map_fig
 
