@@ -12,3 +12,8 @@ wheels/
 # data
 *.db
 *.parquet
+*.db-shm
+*.db-wal
+data/
+
+.DS_Store
